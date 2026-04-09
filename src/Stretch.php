@@ -324,4 +324,118 @@ class Stretch
             'id' => $id,
         ]);
     }
+
+    /**
+     * Create or update a synonym set.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $synonymsSet  The synonyms set rules. Each entry is an array like
+     *                              ['id' => 'rule-1', 'synonyms' => 'foo, bar']
+     * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::putSynonym('my-synonyms', [
+     *     ['id' => 'rule-1', 'synonyms' => 'hello, hi, hey'],
+     *     ['id' => 'rule-2', 'synonyms' => 'goodbye, bye'],
+     * ]);
+     * ```
+     */
+    public function putSynonym(string $id, array $synonymsSet, array $options = []): array
+    {
+        return $this->client->putSynonym($id, $synonymsSet, $options);
+    }
+
+    /**
+     * Get a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $options  Optional parameters (e.g. ['from' => 0, 'size' => 10])
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonym(string $id, array $options = []): array
+    {
+        return $this->client->getSynonym($id, $options);
+    }
+
+    /**
+     * Delete a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function deleteSynonym(string $id): array
+    {
+        return $this->client->deleteSynonym($id);
+    }
+
+    /**
+     * Get all synonym sets.
+     *
+     * @param  array  $options  Optional parameters (e.g. ['from' => 0, 'size' => 10])
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonymsSets(array $options = []): array
+    {
+        return $this->client->getSynonymsSets($options);
+    }
+
+    /**
+     * Create or update a single synonym rule within a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $rule  The rule body (e.g. ['synonyms' => 'foo, bar'])
+     * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::putSynonymRule('my-synonyms', 'rule-1', ['synonyms' => 'hello, hi, hey']);
+     * ```
+     */
+    public function putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []): array
+    {
+        return $this->client->putSynonymRule($setId, $ruleId, $rule, $options);
+    }
+
+    /**
+     * Get a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonymRule(string $setId, string $ruleId): array
+    {
+        return $this->client->getSynonymRule($setId, $ruleId);
+    }
+
+    /**
+     * Delete a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
+     * @return array The Elasticsearch response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function deleteSynonymRule(string $setId, string $ruleId, array $options = []): array
+    {
+        return $this->client->deleteSynonymRule($setId, $ruleId, $options);
+    }
 }

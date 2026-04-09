@@ -129,4 +129,83 @@ interface ClientContract
      * @throws \JayI\Stretch\Exceptions\StretchException If the multi-search fails
      */
     public function msearch(array $params): array;
+
+    /**
+     * Create or update a synonym set.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $synonymsSet  The synonyms set rules (list of synonym entries)
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function putSynonym(string $id, array $synonymsSet, array $options = []): array;
+
+    /**
+     * Get a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $options  Optional extra parameters (e.g. from, size)
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonym(string $id, array $options = []): array;
+
+    /**
+     * Delete a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function deleteSynonym(string $id): array;
+
+    /**
+     * Get all synonym sets.
+     *
+     * @param  array  $options  Optional parameters (e.g. from, size)
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonymsSets(array $options = []): array;
+
+    /**
+     * Create or update a single synonym rule within a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $rule  The rule body (e.g. ['synonyms' => 'foo, bar'])
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []): array;
+
+    /**
+     * Get a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function getSynonymRule(string $setId, string $ruleId): array;
+
+    /**
+     * Delete a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     */
+    public function deleteSynonymRule(string $setId, string $ruleId, array $options = []): array;
 }

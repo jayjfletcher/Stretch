@@ -30,6 +30,13 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array updateDocument(string $index, string $id, array $document) Update a document
  * @method static array deleteDocument(string $index, string $id) Delete a document
  * @method static array getDocument(string $index, string $id) Get a document by ID
+ * @method static array putSynonym(string $id, array $synonymsSet, array $options = []) Create or update a synonym set
+ * @method static array getSynonym(string $id, array $options = []) Get a synonym set by id
+ * @method static array deleteSynonym(string $id) Delete a synonym set by id
+ * @method static array getSynonymsSets(array $options = []) Get all synonym sets
+ * @method static array putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []) Create or update a synonym rule
+ * @method static array getSynonymRule(string $setId, string $ruleId) Get a synonym rule
+ * @method static array deleteSynonymRule(string $setId, string $ruleId, array $options = []) Delete a synonym rule
  *
  * @see \JayI\Stretch\Stretch
  */

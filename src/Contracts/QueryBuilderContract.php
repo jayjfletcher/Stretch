@@ -128,6 +128,32 @@ interface QueryBuilderContract
     public function fuzzy(string $field, mixed $value, array $options = []): static;
 
     /**
+     * Add a top-level kNN search clause for vector similarity search.
+     *
+     * Can be combined with query clauses (match, bool, etc.) to produce
+     * hybrid search — Elasticsearch linearly combines the query and kNN scores.
+     *
+     * @param  string  $field  The dense_vector field to search
+     * @param  array  $queryVector  The query vector
+     * @param  int  $k  Number of nearest neighbours to return
+     * @param  int|null  $numCandidates  Candidates considered per shard
+     * @param  array  $options  Extra kNN options (boost, filter, similarity, etc.)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function knn(string $field, array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static;
+
+    /**
+     * Set the top-level retriever clause for hybrid search.
+     *
+     * Retrievers compose hybrid search pipelines (standard + kNN + rrf).
+     * When a retriever is set, it replaces the `query` and `knn` clauses.
+     *
+     * @param  callable  $callback  Callback receiving a RetrieverBuilder
+     * @return static Returns the builder instance for method chaining
+     */
+    public function retriever(callable $callback): static;
+
+    /**
      * Add an exists query to find documents with a field value.
      *
      * @param  string  $field  The field that must exist

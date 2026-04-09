@@ -31,7 +31,8 @@ it('can create a semantic query', function () {
 
     $query = $builder->build();
 
-    expect($query['query']['semantic']['semantic_contents']['query'])->toBe('What is Laravel?');
+    expect($query['query']['semantic']['field'])->toBe('semantic_contents');
+    expect($query['query']['semantic']['query'])->toBe('What is Laravel?');
 });
 
 it('can create a semantic query with options', function () {
@@ -41,8 +42,9 @@ it('can create a semantic query with options', function () {
 
     $query = $builder->build();
 
-    expect($query['query']['semantic']['semantic_contents']['query'])->toBe('machine learning');
-    expect($query['query']['semantic']['semantic_contents']['boost'])->toBe(2.0);
+    expect($query['query']['semantic']['field'])->toBe('semantic_contents');
+    expect($query['query']['semantic']['query'])->toBe('machine learning');
+    expect($query['query']['semantic']['boost'])->toBe(2.0);
 });
 
 it('can create a range query', function () {

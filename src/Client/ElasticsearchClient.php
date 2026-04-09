@@ -246,6 +246,155 @@ class ElasticsearchClient implements ClientContract
     }
 
     /**
+     * Create or update a synonym set.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $synonymsSet  The synonyms set rules
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putSynonym(string $id, array $synonymsSet, array $options = []): array
+    {
+        try {
+            $params = array_merge($options, [
+                'id' => $id,
+                'body' => ['synonyms_set' => $synonymsSet],
+            ]);
+
+            return $this->client->synonyms()->putSynonym($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @param  array  $options  Optional extra parameters (e.g. from, size)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getSynonym(string $id, array $options = []): array
+    {
+        try {
+            $params = array_merge($options, ['id' => $id]);
+
+            return $this->client->synonyms()->getSynonym($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Delete a synonym set by id.
+     *
+     * @param  string  $id  The synonym set id
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteSynonym(string $id): array
+    {
+        try {
+            return $this->client->synonyms()->deleteSynonym(['id' => $id])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get all synonym sets.
+     *
+     * @param  array  $options  Optional parameters (e.g. from, size)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getSynonymsSets(array $options = []): array
+    {
+        try {
+            return $this->client->synonyms()->getSynonymsSets($options)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get synonym sets: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Create or update a single synonym rule within a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $rule  The rule body (e.g. ['synonyms' => 'foo, bar'])
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []): array
+    {
+        try {
+            $params = array_merge($options, [
+                'set_id' => $setId,
+                'rule_id' => $ruleId,
+                'body' => $rule,
+            ]);
+
+            return $this->client->synonyms()->putSynonymRule($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put synonym rule '{$ruleId}' in set '{$setId}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getSynonymRule(string $setId, string $ruleId): array
+    {
+        try {
+            return $this->client->synonyms()->getSynonymRule([
+                'set_id' => $setId,
+                'rule_id' => $ruleId,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Delete a synonym rule from a synonym set.
+     *
+     * @param  string  $setId  The synonym set id
+     * @param  string  $ruleId  The synonym rule id
+     * @param  array  $options  Optional extra parameters (e.g. refresh)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteSynonymRule(string $setId, string $ruleId, array $options = []): array
+    {
+        try {
+            $params = array_merge($options, [
+                'set_id' => $setId,
+                'rule_id' => $ruleId,
+            ]);
+
+            return $this->client->synonyms()->deleteSynonymRule($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
      * Log a query if query logging is enabled.
      *
      * @param  array  $query  The query to log

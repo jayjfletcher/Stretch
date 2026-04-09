@@ -92,6 +92,23 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     protected bool $cache = false;
 
     /**
+     * Top-level kNN search clauses for vector similarity search.
+     *
+     * @var array<int, array>
+     */
+    protected array $knn = [];
+
+    /**
+     * Top-level retriever clause (e.g. rrf) for hybrid search.
+     *
+     * When set, the retriever replaces the `query` and `knn` clauses in the
+     * request body as per the Elasticsearch retriever API.
+     *
+     * @var array|null
+     */
+    protected ?array $retriever = null;
+
+    /**
      * Create a new ElasticsearchQueryBuilder instance.
      *
      * @param  ClientContract|null  $client  The Elasticsearch client for query execution
@@ -442,6 +459,95 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Add a top-level kNN search clause for vector similarity search.
+     *
+     * Performs approximate k-nearest-neighbor search on a `dense_vector` field.
+     * Supports pre-filtering, boosting, and tuning of HNSW parameters. Can be
+     * combined with a standard query clause to produce hybrid search results —
+     * Elasticsearch will linearly combine the query score and the kNN score.
+     *
+     * Call multiple times to run multiple kNN searches in the same request.
+     *
+     * @param  string  $field  The dense_vector field to search
+     * @param  array  $queryVector  The query vector (numeric array)
+     * @param  int  $k  The number of nearest neighbours to return
+     * @param  int|null  $numCandidates  Candidates considered per shard (defaults to max(k*10, 100))
+     * @param  array  $options  Extra kNN options (boost, filter, similarity, query_vector_builder, etc.)
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * // Pure kNN search
+     * Stretch::index('posts')
+     *     ->knn('title_vector', [0.12, -0.98, ...], k: 10)
+     *     ->execute();
+     *
+     * // Hybrid: combine kNN with a keyword match
+     * Stretch::index('posts')
+     *     ->match('title', 'Laravel')
+     *     ->knn('title_vector', $vector, k: 10, numCandidates: 100, options: ['boost' => 0.5])
+     *     ->execute();
+     *
+     * // kNN with a pre-filter
+     * Stretch::index('posts')
+     *     ->knn('title_vector', $vector, k: 10, options: [
+     *         'filter' => ['term' => ['status' => 'published']],
+     *     ])
+     *     ->execute();
+     * ```
+     */
+    public function knn(string $field, array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static
+    {
+        $knn = array_merge([
+            'field' => $field,
+            'query_vector' => $queryVector,
+            'k' => $k,
+            'num_candidates' => $numCandidates ?? max($k * 10, 100),
+        ], $options);
+
+        $this->knn[] = $knn;
+
+        return $this;
+    }
+
+    /**
+     * Set the top-level retriever clause for hybrid search.
+     *
+     * Retrievers are the modern Elasticsearch API for composing hybrid search
+     * pipelines (standard + kNN + rrf). When a retriever is set, it replaces the
+     * `query` and `knn` clauses in the outgoing request body.
+     *
+     * The callback receives a `RetrieverBuilder` which exposes `standard()`,
+     * `knn()`, and `rrf()` helpers for composing retrievers.
+     *
+     * Requires Elasticsearch 8.14+ (retrievers) / 8.15+ for stable RRF.
+     *
+     * @param  callable  $callback  Callback receiving a RetrieverBuilder
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * // Reciprocal Rank Fusion of a keyword match and a kNN search
+     * Stretch::index('posts')
+     *     ->retriever(function ($r) use ($vector) {
+     *         $r->rrf([
+     *             $r->standard(fn ($q) => $q->match('title', 'Laravel')),
+     *             $r->knn('title_vector', $vector, k: 10, numCandidates: 100),
+     *         ], rankWindowSize: 50, rankConstant: 20);
+     *     })
+     *     ->execute();
+     * ```
+     */
+    public function retriever(callable $callback): static
+    {
+        $retrieverBuilder = new RetrieverBuilder;
+        $callback($retrieverBuilder);
+        $this->retriever = $retrieverBuilder->build();
+
+        return $this;
+    }
+
+    /**
      * Add an exists query to find documents with a field value.
      *
      * Matches documents where the specified field has a non-null value.
@@ -649,6 +755,36 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     public function build(): array
     {
         $body = [];
+
+        // Retrievers (ES 8.14+) replace the top-level query/knn clauses entirely.
+        if ($this->retriever !== null) {
+            $body['retriever'] = $this->retriever;
+            $body['size'] = $this->getSize();
+            $body['from'] = $this->getFrom();
+
+            if (! empty($this->sort)) {
+                $body['sort'] = $this->sort;
+            }
+
+            if ($this->source !== null) {
+                $body['_source'] = $this->source;
+            }
+
+            if (! empty($this->highlight)) {
+                $body['highlight'] = $this->highlight;
+            }
+
+            if (! empty($this->aggregations)) {
+                $body['aggs'] = $this->aggregations;
+            }
+
+            return $body;
+        }
+
+        // Top-level kNN clause(s) for hybrid search via query + knn.
+        if (! empty($this->knn)) {
+            $body['knn'] = count($this->knn) === 1 ? $this->knn[0] : $this->knn;
+        }
 
         // Build the main query
         if (! empty($this->query) || ! empty($this->filters)) {
