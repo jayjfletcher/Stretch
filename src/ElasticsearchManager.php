@@ -81,8 +81,9 @@ class ElasticsearchManager
      * specified connection name. Supports various authentication methods
      * including basic auth, API keys, and Elastic Cloud.
      *
-     * @param string $name The connection name
+     * @param  string  $name  The connection name
      * @return Client The configured Elasticsearch client
+     *
      * @throws ConfigException
      */
     protected function makeConnection(string $name): Client
@@ -110,7 +111,7 @@ class ElasticsearchManager
             $clientBuilder->setSSLVerification(false);
         }
 
-        if(config('stretch.logging.enabled')) {
+        if (config('stretch.logging.enabled')) {
             $clientBuilder->setLogger($this->app['log']);
         }
 

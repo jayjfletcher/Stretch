@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
+use JayI\Stretch\Contracts\ClientContract;
 use Mockery as m;
 
 it('wraps query in body when executing', function () {

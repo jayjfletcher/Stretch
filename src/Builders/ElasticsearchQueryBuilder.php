@@ -11,6 +11,7 @@ use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
 use JayI\Stretch\Contracts\RangeQueryBuilderContract;
 use JayI\Stretch\ElasticsearchManager;
+use JayI\Stretch\Exceptions\StretchException;
 
 /**
  * ElasticsearchQueryBuilder provides a fluent interface for building Elasticsearch queries.
@@ -59,8 +60,6 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
 
     /**
      * Highlighting configuration for search results.
-     *
-     * @var array
      */
     protected array $highlight = [];
 
@@ -103,10 +102,13 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *
      * When set, the retriever replaces the `query` and `knn` clauses in the
      * request body as per the Elasticsearch retriever API.
-     *
-     * @var array|null
      */
     protected ?array $retriever = null;
+
+    /**
+     * Whether to track total hits accurately.
+     */
+    protected bool|int|null $trackTotalHits = null;
 
     /**
      * Create a new ElasticsearchQueryBuilder instance.
@@ -228,6 +230,37 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
             'match_phrase' => [
                 $field => $match,
             ],
+        ]);
+
+        return $this;
+    }
+
+    /**
+     * Add a multi_match query for full-text search across multiple fields.
+     *
+     * @param  string  $query  The search text
+     * @param  array  $fields  Fields to search with optional boosts (e.g. ['title^3', 'description'])
+     * @param  array  $options  Additional options (type, fuzziness, minimum_should_match, prefix_length, etc.)
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $builder->multiMatch('laptop for work', ['name^3', 'description', 'brand^2'], [
+     *     'type' => 'best_fields',
+     *     'fuzziness' => 'AUTO',
+     *     'minimum_should_match' => '75%',
+     * ]);
+     * ```
+     */
+    public function multiMatch(string $query, array $fields, array $options = []): static
+    {
+        $multiMatch = array_merge([
+            'query' => $query,
+            'fields' => $fields,
+        ], $options);
+
+        $this->addQueryProtected([
+            'multi_match' => $multiMatch,
         ]);
 
         return $this;
@@ -413,6 +446,7 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *
      * @example
      * ```php
+     *
      * $builder->wildcard('email', '*@example.com');
      * $builder->wildcard('code', 'ABC-???-*');
      * ```
@@ -494,18 +528,34 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *         'filter' => ['term' => ['status' => 'published']],
      *     ])
      *     ->execute();
+     *
+     * // kNN with server-side embedding via query_vector_builder
+     * Stretch::index('posts')
+     *     ->knn('embedding', null, k: 10, options: [
+     *         'query_vector_builder' => [
+     *             'text_embedding' => [
+     *                 'model_id' => 'my-embeddings',
+     *                 'model_text' => 'search query',
+     *             ],
+     *         ],
+     *     ])
+     *     ->execute();
      * ```
      */
-    public function knn(string $field, array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static
+    public function knn(string $field, ?array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static
     {
-        $knn = array_merge([
+        $knn = [
             'field' => $field,
-            'query_vector' => $queryVector,
             'k' => $k,
             'num_candidates' => $numCandidates ?? max($k * 10, 100),
-        ], $options);
+        ];
 
-        $this->knn[] = $knn;
+        // Only include query_vector when not using query_vector_builder
+        if ($queryVector !== null && ! isset($options['query_vector_builder'])) {
+            $knn['query_vector'] = $queryVector;
+        }
+
+        $this->knn[] = array_merge($knn, $options);
 
         return $this;
     }
@@ -694,6 +744,22 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Set track_total_hits for accurate total hit counts.
+     *
+     * By default Elasticsearch caps total hits at 10,000. Set to true
+     * for exact counts, or an integer for a custom threshold.
+     *
+     * @param  bool|int  $trackTotalHits  true for exact, int for threshold
+     * @return static Returns the builder instance for method chaining
+     */
+    public function trackTotalHits(bool|int $trackTotalHits = true): static
+    {
+        $this->trackTotalHits = $trackTotalHits;
+
+        return $this;
+    }
+
+    /**
      * Add a named aggregation to the query.
      *
      * Aggregations provide analytics and statistics about search results.
@@ -714,6 +780,28 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
         $aggregationBuilder = new AggregationBuilder;
         $callback($aggregationBuilder);
         $this->aggregations[$name] = $aggregationBuilder->build();
+
+        return $this;
+    }
+
+    /**
+     * Add a raw aggregation to the query.
+     *
+     * Escape hatch for aggregation structures not yet covered by the
+     * AggregationBuilder (e.g. filtered aggregations, nested aggs).
+     *
+     * @param  string  $name  Name for this aggregation in the response
+     * @param  array  $aggregation  The raw Elasticsearch aggregation array
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $builder->rawAggregation('price_stats', ['stats' => ['field' => 'price']]);
+     * ```
+     */
+    public function rawAggregation(string $name, array $aggregation): static
+    {
+        $this->aggregations[$name] = $aggregation;
 
         return $this;
     }
@@ -778,6 +866,10 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
                 $body['aggs'] = $this->aggregations;
             }
 
+            if ($this->trackTotalHits !== null) {
+                $body['track_total_hits'] = $this->trackTotalHits;
+            }
+
             return $body;
         }
 
@@ -835,6 +927,10 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
             $body['aggs'] = $this->aggregations;
         }
 
+        if ($this->trackTotalHits !== null) {
+            $body['track_total_hits'] = $this->trackTotalHits;
+        }
+
         return $body;
     }
 
@@ -847,7 +943,7 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      * @return array The Elasticsearch search response
      *
      * @throws \RuntimeException If the client is not set
-     * @throws \JayI\Stretch\Exceptions\StretchException If the search fails
+     * @throws StretchException If the search fails
      */
     public function execute(): array
     {

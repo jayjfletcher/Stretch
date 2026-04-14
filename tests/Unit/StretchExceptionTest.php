@@ -7,12 +7,12 @@ use JayI\Stretch\Exceptions\StretchException;
 it('extends base Exception', function () {
     $exception = new StretchException('Test error');
 
-    expect($exception)->toBeInstanceOf(\Exception::class);
+    expect($exception)->toBeInstanceOf(Exception::class);
     expect($exception->getMessage())->toBe('Test error');
 });
 
 it('preserves the original exception as previous', function () {
-    $original = new \RuntimeException('Original error');
+    $original = new RuntimeException('Original error');
     $exception = new StretchException('Wrapped error', 0, $original);
 
     expect($exception->getPrevious())->toBe($original);

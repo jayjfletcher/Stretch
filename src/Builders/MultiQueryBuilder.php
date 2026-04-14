@@ -11,7 +11,7 @@ use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\MultiQueryBuilderContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
 use JayI\Stretch\ElasticsearchManager;
-use JayI\Stretch\Pagination\ElasticPaginator;
+use JayI\Stretch\Exceptions\StretchException;
 
 /**
  * MultiQueryBuilder provides a fluent interface for building Elasticsearch multi-search requests.
@@ -69,8 +69,7 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
      * Each query can target different indices and have its own search criteria.
      * Queries are executed in parallel by Elasticsearch.
      *
-     * @param string $name
-     * @param callable|QueryBuilderContract $query A callback or query builder instance
+     * @param  callable|QueryBuilderContract  $query  A callback or query builder instance
      * @return static Returns the builder instance for method chaining
      *
      * @example
@@ -138,7 +137,7 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
      * @return array The msearch response with 'responses' array containing each query's result
      *
      * @throws \RuntimeException If the client is not set
-     * @throws \JayI\Stretch\Exceptions\StretchException If the multi-search fails
+     * @throws StretchException If the multi-search fails
      *
      * @example
      * ```php
@@ -166,6 +165,7 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
         $key = -1;
         $results['responses'] = collect($this->queries)->sortKeys()->map(function () use (&$results, &$key) {
             $key++;
+
             return Arr::get($results, "responses.{$key}");
         })->toArray();
 
@@ -192,5 +192,4 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
     {
         return count($this->queries);
     }
-
 }

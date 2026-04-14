@@ -394,6 +394,147 @@ class ElasticsearchClient implements ClientContract
         }
     }
 
+    // ── Ingest Pipelines ────────────────────────────────────
+
+    /**
+     * Create or update an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @param  array  $body  Pipeline definition (description, processors, etc.)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putPipeline(string $id, array $body): array
+    {
+        try {
+            return $this->client->ingest()->putPipeline([
+                'id' => $id,
+                'body' => $body,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get an ingest pipeline by ID.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The pipeline definition
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getPipeline(string $id): array
+    {
+        try {
+            return $this->client->ingest()->getPipeline(['id' => $id])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Delete an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deletePipeline(string $id): array
+    {
+        try {
+            return $this->client->ingest()->deletePipeline(['id' => $id])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    // ── Inference Endpoints ─────────────────────────────────
+
+    /**
+     * Create or update an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @param  string  $taskType  The task type (e.g. 'text_embedding', 'sparse_embedding')
+     * @param  array  $body  Endpoint configuration (service, service_settings, etc.)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putInferenceEndpoint(string $inferenceId, string $taskType, array $body): array
+    {
+        try {
+            return $this->client->inference()->put([
+                'inference_id' => $inferenceId,
+                'task_type' => $taskType,
+                'body' => $body,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get an inference endpoint by ID.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The endpoint configuration
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getInferenceEndpoint(string $inferenceId): array
+    {
+        try {
+            return $this->client->inference()->get([
+                'inference_id' => $inferenceId,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Delete an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteInferenceEndpoint(string $inferenceId): array
+    {
+        try {
+            return $this->client->inference()->delete([
+                'inference_id' => $inferenceId,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    // ── ML / Trained Models ─────────────────────────────────
+
+    /**
+     * Get stats for a trained ML model.
+     *
+     * @param  string  $modelId  The trained model ID
+     * @return array The model stats including deployment status
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTrainedModelStats(string $modelId): array
+    {
+        try {
+            return $this->client->ml()->getTrainedModelsStats([
+                'model_id' => $modelId,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
     /**
      * Log a query if query logging is enabled.
      *

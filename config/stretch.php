@@ -47,7 +47,7 @@ return [
         'default_size' => 10,
         'max_size' => 10000,
         'timeout' => env('ELASTICSEARCH_TIMEOUT', '10s'), // not supported yet
-        'allow_partial_search_results' => true, //not supported yet
+        'allow_partial_search_results' => true, // not supported yet
     ],
 
     /*

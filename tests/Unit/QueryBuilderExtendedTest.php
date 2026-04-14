@@ -85,7 +85,7 @@ it('can add highlight configuration', function () {
 
     $builder->match('title', 'Laravel')
         ->highlight(
-            ['title' => new \stdClass, 'content' => ['fragment_size' => 150]],
+            ['title' => new stdClass, 'content' => ['fragment_size' => 150]],
             ['pre_tags' => ['<em>'], 'post_tags' => ['</em>']]
         );
 
@@ -236,7 +236,7 @@ it('throws RuntimeException when executing without client', function () {
     $builder->match('title', 'test');
 
     expect(fn () => $builder->execute())
-        ->toThrow(\RuntimeException::class, 'Client not set. Cannot execute query.');
+        ->toThrow(RuntimeException::class, 'Client not set. Cannot execute query.');
 });
 
 it('can create a match query with options', function () {
@@ -256,7 +256,7 @@ it('can create a nested query with multiple clauses', function () {
 
     $builder->nested('comments', function ($q) {
         $q->match('comments.content', 'great')
-          ->term('comments.author', 'john');
+            ->term('comments.author', 'john');
     });
 
     $query = $builder->build();

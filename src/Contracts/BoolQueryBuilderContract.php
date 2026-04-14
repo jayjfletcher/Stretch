@@ -60,6 +60,14 @@ interface BoolQueryBuilderContract
     public function getParent(): QueryBuilderContract;
 
     /**
+     * Set a boost factor on the entire bool query.
+     *
+     * @param  float  $boost  The boost factor
+     * @return static Returns the builder instance for method chaining
+     */
+    public function boost(float $boost): static;
+
+    /**
      * Build the bool query array.
      *
      * @return array The Elasticsearch bool query structure

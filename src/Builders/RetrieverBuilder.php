@@ -65,14 +65,19 @@ class RetrieverBuilder
      * @param  array  $options  Extra options (filter, similarity, query_vector_builder, etc.)
      * @return array The built knn retriever clause
      */
-    public function knn(string $field, array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): array
+    public function knn(string $field, ?array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): array
     {
-        $knn = array_merge([
+        $knn = [
             'field' => $field,
-            'query_vector' => $queryVector,
             'k' => $k,
             'num_candidates' => $numCandidates ?? max($k * 10, 100),
-        ], $options);
+        ];
+
+        if ($queryVector !== null && ! isset($options['query_vector_builder'])) {
+            $knn['query_vector'] = $queryVector;
+        }
+
+        $knn = array_merge($knn, $options);
 
         $retriever = ['knn' => $knn];
         $this->retriever = $retriever;

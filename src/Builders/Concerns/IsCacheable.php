@@ -40,8 +40,6 @@ trait IsCacheable
 
     /**
      * Custom TTL for flexible caching [fresh, stale].
-     *
-     * @var array|int|null
      */
     protected array|int|null $cacheTtl = null;
 
@@ -91,7 +89,7 @@ trait IsCacheable
     /**
      * Set whether caching is enabled.
      *
-     * @param bool $cacheEnabled Whether to enable caching
+     * @param  bool  $cacheEnabled  Whether to enable caching
      * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
      */
     public function setCacheEnabled(bool $cacheEnabled = true): self
@@ -114,7 +112,7 @@ trait IsCacheable
     /**
      * Set whether to clear the cache before execution.
      *
-     * @param bool $clear Whether to clear the cache
+     * @param  bool  $clear  Whether to clear the cache
      * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
      */
     public function setCacheClear(bool $clear = true): self
@@ -140,7 +138,7 @@ trait IsCacheable
      * Uses Laravel's flexible cache method, which supports stale-while-revalidate.
      * The first value is the "fresh" period, the second is the "stale" period.
      *
-     * @param array|int $ttl Array of [fresh_seconds, stale_seconds] or int
+     * @param  array|int  $ttl  Array of [fresh_seconds, stale_seconds] or int
      * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
      *
      * @example
@@ -170,7 +168,7 @@ trait IsCacheable
     /**
      * Set a custom prefix for the cache key.
      *
-     * @param string $prefix The prefix to prepend to cache keys
+     * @param  string  $prefix  The prefix to prepend to cache keys
      * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
      */
     public function setCachePrefix(string $prefix): self
@@ -195,7 +193,7 @@ trait IsCacheable
     /**
      * Set a custom cache store.
      *
-     * @param string $store The Laravel cache store name
+     * @param  string  $store  The Laravel cache store name
      * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
      */
     public function setCacheStore(string $store): self

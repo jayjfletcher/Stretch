@@ -131,3 +131,77 @@ it('can create top hits aggregation with custom size', function () {
 
     expect($built['top_hits']['size'])->toBe(50);
 });
+
+it('can create a stats aggregation', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->stats('price');
+
+    $built = $agg->build();
+
+    expect($built['stats']['field'])->toBe('price');
+});
+
+it('can set a raw aggregation', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->raw(['stats' => ['field' => 'price']]);
+
+    $built = $agg->build();
+
+    expect($built)->toBe(['stats' => ['field' => 'price']]);
+});
+
+it('can set a complex raw aggregation with nested aggs', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->raw([
+        'nested' => ['path' => 'attributes'],
+        'aggs' => [
+            'keys' => [
+                'terms' => ['field' => 'attributes.key', 'size' => 20],
+                'aggs' => [
+                    'values' => [
+                        'terms' => ['field' => 'attributes.value', 'size' => 30],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $built = $agg->build();
+
+    expect($built)->toHaveKey('nested')
+        ->and($built['nested']['path'])->toBe('attributes')
+        ->and($built['aggs']['keys']['terms']['field'])->toBe('attributes.key');
+});
+
+it('can set a filtered raw aggregation', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->raw([
+        'filter' => ['bool' => ['filter' => [['terms' => ['brand' => ['Apple']]]]]],
+        'aggs' => [
+            'brand' => ['terms' => ['field' => 'brand', 'size' => 100]],
+        ],
+    ]);
+
+    $built = $agg->build();
+
+    expect($built)->toHaveKey('filter')
+        ->and($built)->toHaveKey('aggs')
+        ->and($built['aggs']['brand']['terms']['field'])->toBe('brand');
+});
+
+it('raw aggregation bypasses size and order logic', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->raw(['custom_agg' => ['field' => 'test']])
+        ->size(999)
+        ->orderBy('_count', 'desc');
+
+    $built = $agg->build();
+
+    // size and order only apply to terms aggregations, raw should be untouched
+    expect($built)->toBe(['custom_agg' => ['field' => 'test']]);
+});

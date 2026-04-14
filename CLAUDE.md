@@ -17,13 +17,14 @@ Stretch is a Laravel package providing a fluent query builder for Elasticsearch.
 
 ### Core Components
 
-- **`Stretch`** (`src/Stretch.php`) - Main entry point, provides index management and document operations. Accessed via `Stretch` facade.
+- **`Stretch`** (`src/Stretch.php`) - Main entry point, provides index management, document operations, pipeline/inference/ML management. Accessed via `Stretch` facade.
 - **`ElasticsearchQueryBuilder`** (`src/Builders/ElasticsearchQueryBuilder.php`) - Fluent query builder implementing `QueryBuilderContract`. Created via `Stretch::index()` or `Stretch::query()`.
 - **`MultiQueryBuilder`** (`src/Builders/MultiQueryBuilder.php`) - Executes multiple named queries in a single request via `Stretch::multi()`. Queries are added with `->add('name', callback)` and executed together.
-- **`BoolQueryBuilder`** (`src/Builders/BoolQueryBuilder.php`) - Handles bool queries with must/should/filter/mustNot clauses.
-- **`AggregationBuilder`** (`src/Builders/AggregationBuilder.php`) - Builds aggregations (terms, date histogram, metrics) with sub-aggregation support.
+- **`BoolQueryBuilder`** (`src/Builders/BoolQueryBuilder.php`) - Handles bool queries with must/should/filter/mustNot clauses and boost.
+- **`AggregationBuilder`** (`src/Builders/AggregationBuilder.php`) - Builds aggregations (terms, date histogram, range, stats, metrics) with sub-aggregation support and a `raw()` escape hatch.
 - **`RangeQueryBuilder`** (`src/Builders/RangeQueryBuilder.php`) - Chainable range query methods (gt/gte/lt/lte).
-- **`ElasticPaginator`** (`src/Pagination/ElasticPaginator.php`) - Extends Laravel's `LengthAwarePaginator` for Elasticsearch results. Use `ElasticPaginator::fromResults()` to create from query results.
+- **`RetrieverBuilder`** (`src/Builders/RetrieverBuilder.php`) - Composes hybrid search pipelines (standard + kNN + RRF) for ES 8.14+.
+- **`ElasticPaginator`** (`src/Pagination/ElasticPaginator.php`) - Extends Laravel's `LengthAwarePaginator` for Elasticsearch results. Use `ElasticPaginator::fromResponse()` to create from query results.
 
 ### Service Registration
 
@@ -35,6 +36,94 @@ Stretch is a Laravel package providing a fluent query builder for Elasticsearch.
 ### Query Builder Pattern
 
 The query builder uses a builder pattern with internal arrays (`$query`, `$aggregations`, `$sort`, etc.) that are assembled in `build()` and sent via `execute()`. Multiple queries added without explicit bool wrapping are auto-wrapped in `bool.must`.
+
+### Query Types
+
+- `match()` - Full-text search on a single field
+- `matchPhrase()` - Exact phrase matching
+- `multiMatch()` - Full-text search across multiple fields with boosts, fuzziness, type options
+- `semantic()` - Semantic/vector search on embedding fields
+- `term()` / `terms()` - Exact value matching
+- `range()` - Numeric/date range queries (returns chainable RangeQueryBuilder)
+- `bool()` - Composite bool queries with must/should/filter/mustNot/boost
+- `nested()` - Queries on nested object types
+- `wildcard()` / `fuzzy()` / `exists()` - Pattern, approximate, and existence queries
+- `knn()` - k-nearest-neighbor vector search (supports both literal vectors and `query_vector_builder` for server-side embeddings)
+- `retriever()` - Modern ES 8.14+ retriever API (standard, kNN, RRF)
+- `filter()` - Filter context (no scoring, cached)
+
+### kNN with Server-Side Embeddings
+
+Pass `null` for the vector parameter and provide `query_vector_builder` in options to let Elasticsearch generate embeddings:
+
+```php
+->knn('embedding', null, k: 10, options: [
+    'query_vector_builder' => [
+        'text_embedding' => [
+            'model_id' => 'my-embeddings',
+            'model_text' => 'search query',
+        ],
+    ],
+])
+```
+
+### Aggregations
+
+- Builder methods: `terms()`, `dateHistogram()`, `range()`, `histogram()`, `avg()`, `sum()`, `min()`, `max()`, `count()`, `cardinality()`, `topHits()`, `stats()`
+- `raw()` - Escape hatch for any aggregation structure not covered by the builder (filtered aggs, nested aggs, etc.)
+- `rawAggregation()` on the query builder - Adds a raw aggregation directly without going through the AggregationBuilder
+
+### Bool Query Boost
+
+The `BoolQueryBuilder` supports a `boost()` method to set a boost factor on the entire bool clause:
+
+```php
+->bool(function ($bool) {
+    $bool->should(fn ($q) => $q->multiMatch('query', ['title', 'description']))
+        ->minimumShouldMatch(1)
+        ->boost(0.7);
+})
+```
+
+### Track Total Hits
+
+Use `trackTotalHits()` to get accurate total hit counts beyond the default 10,000 cap:
+
+```php
+->trackTotalHits()      // true for exact count
+->trackTotalHits(5000)  // integer threshold
+```
+
+### Ingest Pipelines
+
+CRUD operations for Elasticsearch ingest pipelines:
+
+```php
+Stretch::putPipeline('my-pipeline', ['description' => '...', 'processors' => [...]]);
+Stretch::getPipeline('my-pipeline');
+Stretch::deletePipeline('my-pipeline');
+```
+
+### Inference Endpoints
+
+CRUD operations for Elasticsearch inference endpoints (ML model deployment):
+
+```php
+Stretch::putInferenceEndpoint('my-embeddings', 'text_embedding', [
+    'service' => 'elasticsearch',
+    'service_settings' => ['model_id' => '.multilingual-e5-small'],
+]);
+Stretch::getInferenceEndpoint('my-embeddings');
+Stretch::deleteInferenceEndpoint('my-embeddings');
+```
+
+### ML / Trained Models
+
+Get deployment stats for trained ML models:
+
+```php
+Stretch::getTrainedModelStats('.multilingual-e5-small');
+```
 
 ### Multi-Connection Support
 

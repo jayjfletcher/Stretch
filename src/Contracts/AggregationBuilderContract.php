@@ -122,6 +122,26 @@ interface AggregationBuilderContract
     public function orderBy(string $field, string $direction = 'asc'): static;
 
     /**
+     * Create a stats metric aggregation.
+     *
+     * Returns count, min, max, avg, and sum in a single request.
+     *
+     * @param  string  $field  The numeric field to calculate stats for
+     * @return static Returns the builder instance for method chaining
+     */
+    public function stats(string $field): static;
+
+    /**
+     * Set the aggregation to a raw Elasticsearch aggregation array.
+     *
+     * Escape hatch for aggregation structures not covered by the builder.
+     *
+     * @param  array  $aggregation  The raw Elasticsearch aggregation definition
+     * @return static Returns the builder instance for method chaining
+     */
+    public function raw(array $aggregation): static;
+
+    /**
      * Build the aggregation array.
      *
      * @return array The Elasticsearch aggregation structure

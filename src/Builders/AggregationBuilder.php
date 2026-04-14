@@ -27,8 +27,6 @@ class AggregationBuilder implements AggregationBuilderContract
 {
     /**
      * The main aggregation definition.
-     *
-     * @var array
      */
     protected array $aggregation = [];
 
@@ -46,8 +44,6 @@ class AggregationBuilder implements AggregationBuilderContract
 
     /**
      * Ordering configuration for bucket aggregations.
-     *
-     * @var array
      */
     protected array $order = [];
 
@@ -299,6 +295,50 @@ class AggregationBuilder implements AggregationBuilderContract
                 'order' => $direction,
             ],
         ];
+
+        return $this;
+    }
+
+    /**
+     * Create a stats metric aggregation.
+     *
+     * Returns count, min, max, avg, and sum in a single request.
+     *
+     * @param  string  $field  The numeric field to calculate stats for
+     * @return static Returns the builder instance for method chaining
+     */
+    public function stats(string $field): static
+    {
+        $this->aggregation = [
+            'stats' => [
+                'field' => $field,
+            ],
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Set the aggregation to a raw Elasticsearch aggregation array.
+     *
+     * Escape hatch for aggregation structures not covered by the builder,
+     * such as filtered aggregations, nested aggregations with multiple
+     * levels, or any other complex structure.
+     *
+     * @param  array  $aggregation  The raw Elasticsearch aggregation definition
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $builder->aggregation('filtered_brand', fn($agg) => $agg->raw([
+     *     'filter' => ['bool' => ['filter' => $filterClauses]],
+     *     'aggs' => ['brand' => ['terms' => ['field' => 'brand', 'size' => 100]]],
+     * ]));
+     * ```
+     */
+    public function raw(array $aggregation): static
+    {
+        $this->aggregation = $aggregation;
 
         return $this;
     }

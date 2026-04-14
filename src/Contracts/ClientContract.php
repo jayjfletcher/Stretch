@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JayI\Stretch\Contracts;
 
+use JayI\Stretch\Exceptions\StretchException;
+
 /**
  * Contract for Elasticsearch client implementations.
  *
@@ -19,7 +21,7 @@ interface ClientContract
      * @param  array  $params  Search parameters including index and body
      * @return array The search response as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the search fails
+     * @throws StretchException If the search fails
      */
     public function search(array $params): array;
 
@@ -29,7 +31,7 @@ interface ClientContract
      * @param  array  $params  Index parameters including index, id, and body
      * @return array The index response as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the index operation fails
+     * @throws StretchException If the index operation fails
      */
     public function index(array $params): array;
 
@@ -39,7 +41,7 @@ interface ClientContract
      * @param  array  $params  Update parameters including index, id, and body
      * @return array The update response as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the update fails
+     * @throws StretchException If the update fails
      */
     public function update(array $params): array;
 
@@ -49,7 +51,7 @@ interface ClientContract
      * @param  array  $params  Delete parameters including index and id
      * @return array The delete response as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the delete fails
+     * @throws StretchException If the delete fails
      */
     public function delete(array $params): array;
 
@@ -59,7 +61,7 @@ interface ClientContract
      * @param  array  $params  Bulk parameters with body containing operations
      * @return array The bulk response as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the bulk operation fails
+     * @throws StretchException If the bulk operation fails
      */
     public function bulk(array $params): array;
 
@@ -68,7 +70,7 @@ interface ClientContract
      *
      * @return array Array of index information
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If retrieving indices fails
+     * @throws StretchException If retrieving indices fails
      */
     public function indices(): array;
 
@@ -87,7 +89,7 @@ interface ClientContract
      * @param  array  $settings  Optional index settings and mappings
      * @return array The create index response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If index creation fails
+     * @throws StretchException If index creation fails
      */
     public function createIndex(string $index, array $settings = []): array;
 
@@ -97,7 +99,7 @@ interface ClientContract
      * @param  string  $index  The index name to delete
      * @return array The delete index response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If index deletion fails
+     * @throws StretchException If index deletion fails
      */
     public function deleteIndex(string $index): array;
 
@@ -106,7 +108,7 @@ interface ClientContract
      *
      * @return array The cluster health response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If health check fails
+     * @throws StretchException If health check fails
      */
     public function health(): array;
 
@@ -116,7 +118,7 @@ interface ClientContract
      * @param  array  $params  Get parameters including index and id
      * @return array The document as an array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the get operation fails
+     * @throws StretchException If the get operation fails
      */
     public function get(array $params): array;
 
@@ -126,7 +128,7 @@ interface ClientContract
      * @param  array  $params  Multi-search parameters with body
      * @return array The multi-search response with 'responses' array
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the multi-search fails
+     * @throws StretchException If the multi-search fails
      */
     public function msearch(array $params): array;
 
@@ -138,7 +140,7 @@ interface ClientContract
      * @param  array  $options  Optional extra parameters (e.g. refresh)
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function putSynonym(string $id, array $synonymsSet, array $options = []): array;
 
@@ -149,7 +151,7 @@ interface ClientContract
      * @param  array  $options  Optional extra parameters (e.g. from, size)
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonym(string $id, array $options = []): array;
 
@@ -159,7 +161,7 @@ interface ClientContract
      * @param  string  $id  The synonym set id
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function deleteSynonym(string $id): array;
 
@@ -169,7 +171,7 @@ interface ClientContract
      * @param  array  $options  Optional parameters (e.g. from, size)
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonymsSets(array $options = []): array;
 
@@ -182,7 +184,7 @@ interface ClientContract
      * @param  array  $options  Optional extra parameters (e.g. refresh)
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []): array;
 
@@ -193,7 +195,7 @@ interface ClientContract
      * @param  string  $ruleId  The synonym rule id
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonymRule(string $setId, string $ruleId): array;
 
@@ -205,7 +207,86 @@ interface ClientContract
      * @param  array  $options  Optional extra parameters (e.g. refresh)
      * @return array The response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function deleteSynonymRule(string $setId, string $ruleId, array $options = []): array;
+
+    // ── Ingest Pipelines ────────────────────────────────────
+
+    /**
+     * Create or update an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @param  array  $body  Pipeline definition (description, processors, etc.)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putPipeline(string $id, array $body): array;
+
+    /**
+     * Get an ingest pipeline by ID.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The pipeline definition
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getPipeline(string $id): array;
+
+    /**
+     * Delete an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deletePipeline(string $id): array;
+
+    // ── Inference Endpoints ─────────────────────────────────
+
+    /**
+     * Create or update an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @param  string  $taskType  The task type (e.g. 'text_embedding', 'sparse_embedding')
+     * @param  array  $body  Endpoint configuration (service, service_settings, etc.)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putInferenceEndpoint(string $inferenceId, string $taskType, array $body): array;
+
+    /**
+     * Get an inference endpoint by ID.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The endpoint configuration
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getInferenceEndpoint(string $inferenceId): array;
+
+    /**
+     * Delete an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteInferenceEndpoint(string $inferenceId): array;
+
+    // ── ML / Trained Models ─────────────────────────────────
+
+    /**
+     * Get stats for a trained ML model.
+     *
+     * @param  string  $modelId  The trained model ID
+     * @return array The model stats including deployment status
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTrainedModelStats(string $modelId): array;
 }

@@ -182,6 +182,66 @@ it('returns the parent query builder via getParent', function () {
     expect($boolBuilder->getParent())->toBe($parent);
 });
 
+it('can set a boost on the bool query', function () {
+    $parent = new ElasticsearchQueryBuilder;
+    $boolBuilder = new BoolQueryBuilder($parent);
+
+    $boolBuilder->must(fn ($q) => $q->match('title', 'Laravel'))
+        ->boost(0.7);
+
+    $result = $boolBuilder->build();
+
+    expect($result['bool'])->toHaveKey('boost')
+        ->and($result['bool']['boost'])->toBe(0.7);
+});
+
+it('does not include boost when not set', function () {
+    $parent = new ElasticsearchQueryBuilder;
+    $boolBuilder = new BoolQueryBuilder($parent);
+
+    $boolBuilder->must(fn ($q) => $q->match('title', 'Laravel'));
+
+    $result = $boolBuilder->build();
+
+    expect($result['bool'])->not->toHaveKey('boost');
+});
+
+it('includes boost in combined bool query', function () {
+    $parent = new ElasticsearchQueryBuilder;
+    $boolBuilder = new BoolQueryBuilder($parent);
+
+    $boolBuilder
+        ->should([
+            fn ($q) => $q->match('title', 'test'),
+            fn ($q) => $q->match('description', 'test'),
+        ])
+        ->filter(fn ($q) => $q->term('status', 'active'))
+        ->minimumShouldMatch(1)
+        ->boost(0.5);
+
+    $result = $boolBuilder->build();
+
+    expect($result['bool']['should'])->toHaveCount(2)
+        ->and($result['bool']['filter'])->toHaveCount(1)
+        ->and($result['bool']['minimum_should_match'])->toBe(1)
+        ->and($result['bool']['boost'])->toBe(0.5);
+});
+
+it('boost integrates with the query builder bool() method', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->bool(function ($bool) {
+        $bool->should(fn ($q) => $q->match('title', 'Laravel'))
+            ->minimumShouldMatch(1)
+            ->boost(0.7);
+    });
+
+    $query = $builder->build();
+
+    expect($query['query']['bool']['boost'])->toBe(0.7)
+        ->and($query['query']['bool']['minimum_should_match'])->toBe(1);
+});
+
 it('supports method chaining on all clause methods', function () {
     $parent = new ElasticsearchQueryBuilder;
     $boolBuilder = new BoolQueryBuilder($parent);

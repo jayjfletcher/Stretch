@@ -35,7 +35,7 @@ it('throws exception for unconfigured connection', function () {
     $manager = new ElasticsearchManager($this->app);
 
     expect(fn () => $manager->connection('nonexistent'))
-        ->toThrow(\InvalidArgumentException::class, 'Elasticsearch connection [nonexistent] not configured.');
+        ->toThrow(InvalidArgumentException::class, 'Elasticsearch connection [nonexistent] not configured.');
 });
 
 it('can purge a cached connection', function () {

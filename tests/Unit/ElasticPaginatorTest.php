@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Pagination\LengthAwarePaginator;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
 use JayI\Stretch\Pagination\ElasticPaginator;
 
@@ -97,7 +98,7 @@ it('extends LengthAwarePaginator', function () {
         currentPage: 1,
     );
 
-    expect($paginator)->toBeInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class);
+    expect($paginator)->toBeInstanceOf(LengthAwarePaginator::class);
     expect($paginator->total())->toBe(100);
     expect($paginator->perPage())->toBe(10);
     expect($paginator->lastPage())->toBe(10);

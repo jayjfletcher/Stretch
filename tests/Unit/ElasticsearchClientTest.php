@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use JayI\Stretch\Client\ElasticsearchClient;
+use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Exceptions\StretchException;
 
 beforeEach(function () {
@@ -22,14 +23,35 @@ beforeEach(function () {
 class TestableElasticsearchClient extends ElasticsearchClient
 {
     public ?Closure $searchHandler = null;
+
     public ?Closure $indexHandler = null;
+
     public ?Closure $updateHandler = null;
+
     public ?Closure $deleteHandler = null;
+
     public ?Closure $bulkHandler = null;
+
     public ?Closure $getHandler = null;
+
     public ?Closure $msearchHandler = null;
 
+    public ?Closure $putPipelineHandler = null;
+
+    public ?Closure $getPipelineHandler = null;
+
+    public ?Closure $deletePipelineHandler = null;
+
+    public ?Closure $putInferenceEndpointHandler = null;
+
+    public ?Closure $getInferenceEndpointHandler = null;
+
+    public ?Closure $deleteInferenceEndpointHandler = null;
+
+    public ?Closure $getTrainedModelStatsHandler = null;
+
     public array $loggedMessages = [];
+
     public array $loggedSlowQueries = [];
 
     public function __construct()
@@ -45,7 +67,7 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->searchHandler) {
                 $response = ($this->searchHandler)($params);
             } else {
-                throw new \Exception('No search handler set');
+                throw new Exception('No search handler set');
             }
 
             $this->logSlowQuery($params, $response);
@@ -53,7 +75,7 @@ class TestableElasticsearchClient extends ElasticsearchClient
             return $response;
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Search failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -64,10 +86,10 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->indexHandler) {
                 return ($this->indexHandler)($params);
             }
-            throw new \Exception('No index handler set');
+            throw new Exception('No index handler set');
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Index operation failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -78,10 +100,10 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->updateHandler) {
                 return ($this->updateHandler)($params);
             }
-            throw new \Exception('No update handler set');
+            throw new Exception('No update handler set');
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Update operation failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -92,10 +114,10 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->deleteHandler) {
                 return ($this->deleteHandler)($params);
             }
-            throw new \Exception('No delete handler set');
+            throw new Exception('No delete handler set');
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Delete operation failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -106,10 +128,10 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->bulkHandler) {
                 return ($this->bulkHandler)($params);
             }
-            throw new \Exception('No bulk handler set');
+            throw new Exception('No bulk handler set');
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Bulk operation failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -120,10 +142,10 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->getHandler) {
                 return ($this->getHandler)($params);
             }
-            throw new \Exception('No get handler set');
+            throw new Exception('No get handler set');
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Get operation failed: {$exception->getMessage()}", 0, $exception);
         }
     }
@@ -136,7 +158,7 @@ class TestableElasticsearchClient extends ElasticsearchClient
             if ($this->msearchHandler) {
                 $response = ($this->msearchHandler)($params);
             } else {
-                throw new \Exception('No msearch handler set');
+                throw new Exception('No msearch handler set');
             }
 
             $this->logSlowQuery($params, $response);
@@ -144,8 +166,106 @@ class TestableElasticsearchClient extends ElasticsearchClient
             return $response;
         } catch (StretchException $e) {
             throw $e;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             throw new StretchException("Multi-search operation failed: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function putPipeline(string $id, array $body): array
+    {
+        try {
+            if ($this->putPipelineHandler) {
+                return ($this->putPipelineHandler)($id, $body);
+            }
+            throw new Exception('No putPipeline handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function getPipeline(string $id): array
+    {
+        try {
+            if ($this->getPipelineHandler) {
+                return ($this->getPipelineHandler)($id);
+            }
+            throw new Exception('No getPipeline handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function deletePipeline(string $id): array
+    {
+        try {
+            if ($this->deletePipelineHandler) {
+                return ($this->deletePipelineHandler)($id);
+            }
+            throw new Exception('No deletePipeline handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete pipeline '$id': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function putInferenceEndpoint(string $inferenceId, string $taskType, array $body): array
+    {
+        try {
+            if ($this->putInferenceEndpointHandler) {
+                return ($this->putInferenceEndpointHandler)($inferenceId, $taskType, $body);
+            }
+            throw new Exception('No putInferenceEndpoint handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function getInferenceEndpoint(string $inferenceId): array
+    {
+        try {
+            if ($this->getInferenceEndpointHandler) {
+                return ($this->getInferenceEndpointHandler)($inferenceId);
+            }
+            throw new Exception('No getInferenceEndpoint handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function deleteInferenceEndpoint(string $inferenceId): array
+    {
+        try {
+            if ($this->deleteInferenceEndpointHandler) {
+                return ($this->deleteInferenceEndpointHandler)($inferenceId);
+            }
+            throw new Exception('No deleteInferenceEndpoint handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to delete inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function getTrainedModelStats(string $modelId): array
+    {
+        try {
+            if ($this->getTrainedModelStatsHandler) {
+                return ($this->getTrainedModelStatsHandler)($modelId);
+            }
+            throw new Exception('No getTrainedModelStats handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", 0, $exception);
         }
     }
 }
@@ -153,7 +273,7 @@ class TestableElasticsearchClient extends ElasticsearchClient
 it('wraps search exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->searchHandler = function () {
-        throw new \RuntimeException('Connection refused');
+        throw new RuntimeException('Connection refused');
     };
 
     expect(fn () => $client->search(['index' => 'test']))
@@ -163,7 +283,7 @@ it('wraps search exceptions in StretchException', function () {
 it('wraps index exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->indexHandler = function () {
-        throw new \RuntimeException('Index error');
+        throw new RuntimeException('Index error');
     };
 
     expect(fn () => $client->index(['index' => 'test', 'body' => []]))
@@ -173,7 +293,7 @@ it('wraps index exceptions in StretchException', function () {
 it('wraps update exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->updateHandler = function () {
-        throw new \RuntimeException('Update error');
+        throw new RuntimeException('Update error');
     };
 
     expect(fn () => $client->update(['index' => 'test', 'id' => '1', 'body' => []]))
@@ -183,7 +303,7 @@ it('wraps update exceptions in StretchException', function () {
 it('wraps delete exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->deleteHandler = function () {
-        throw new \RuntimeException('Delete error');
+        throw new RuntimeException('Delete error');
     };
 
     expect(fn () => $client->delete(['index' => 'test', 'id' => '1']))
@@ -193,7 +313,7 @@ it('wraps delete exceptions in StretchException', function () {
 it('wraps bulk exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->bulkHandler = function () {
-        throw new \RuntimeException('Bulk error');
+        throw new RuntimeException('Bulk error');
     };
 
     expect(fn () => $client->bulk(['body' => []]))
@@ -203,7 +323,7 @@ it('wraps bulk exceptions in StretchException', function () {
 it('wraps get exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->getHandler = function () {
-        throw new \RuntimeException('Get error');
+        throw new RuntimeException('Get error');
     };
 
     expect(fn () => $client->get(['index' => 'test', 'id' => '1']))
@@ -213,7 +333,7 @@ it('wraps get exceptions in StretchException', function () {
 it('wraps msearch exceptions in StretchException', function () {
     $client = new TestableElasticsearchClient;
     $client->msearchHandler = function () {
-        throw new \RuntimeException('Msearch error');
+        throw new RuntimeException('Msearch error');
     };
 
     expect(fn () => $client->msearch(['body' => []]))
@@ -221,7 +341,7 @@ it('wraps msearch exceptions in StretchException', function () {
 });
 
 it('preserves original exception as previous in StretchException', function () {
-    $originalException = new \RuntimeException('Original error');
+    $originalException = new RuntimeException('Original error');
 
     $client = new TestableElasticsearchClient;
     $client->searchHandler = function () use ($originalException) {
@@ -267,7 +387,7 @@ it('logs queries when log_queries is enabled', function () {
     $client->searchHandler = fn () => $responseData;
 
     // Should not throw - logging should work
-    $result = $client->search(['index' => 'test', 'body' => ['query' => ['match_all' => new \stdClass]]]);
+    $result = $client->search(['index' => 'test', 'body' => ['query' => ['match_all' => new stdClass]]]);
 
     expect($result)->toBe($responseData);
 });
@@ -309,7 +429,7 @@ it('does not log when logging is disabled', function () {
 it('implements ClientContract interface', function () {
     $client = new TestableElasticsearchClient;
 
-    expect($client)->toBeInstanceOf(\JayI\Stretch\Contracts\ClientContract::class);
+    expect($client)->toBeInstanceOf(ClientContract::class);
 });
 
 it('can successfully index a document', function () {
@@ -345,4 +465,169 @@ it('can successfully execute msearch', function () {
     $result = $client->msearch(['body' => []]);
 
     expect($result['responses'])->toHaveCount(1);
+});
+
+// ── Ingest Pipeline Tests ───────────────────────────────
+
+it('can put an ingest pipeline', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putPipelineHandler = fn ($id, $body) => ['acknowledged' => true];
+
+    $result = $client->putPipeline('my-pipeline', [
+        'description' => 'Test pipeline',
+        'processors' => [],
+    ]);
+
+    expect($result['acknowledged'])->toBeTrue();
+});
+
+it('wraps putPipeline exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putPipelineHandler = function () {
+        throw new RuntimeException('Pipeline error');
+    };
+
+    expect(fn () => $client->putPipeline('my-pipeline', []))
+        ->toThrow(StretchException::class, "Failed to put pipeline 'my-pipeline'");
+});
+
+it('can get an ingest pipeline', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getPipelineHandler = fn ($id) => [
+        $id => ['description' => 'Test pipeline', 'processors' => []],
+    ];
+
+    $result = $client->getPipeline('my-pipeline');
+
+    expect($result)->toHaveKey('my-pipeline');
+});
+
+it('wraps getPipeline exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getPipelineHandler = function () {
+        throw new RuntimeException('Not found');
+    };
+
+    expect(fn () => $client->getPipeline('missing'))
+        ->toThrow(StretchException::class, "Failed to get pipeline 'missing'");
+});
+
+it('can delete an ingest pipeline', function () {
+    $client = new TestableElasticsearchClient;
+    $client->deletePipelineHandler = fn ($id) => ['acknowledged' => true];
+
+    $result = $client->deletePipeline('my-pipeline');
+
+    expect($result['acknowledged'])->toBeTrue();
+});
+
+it('wraps deletePipeline exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->deletePipelineHandler = function () {
+        throw new RuntimeException('Delete error');
+    };
+
+    expect(fn () => $client->deletePipeline('my-pipeline'))
+        ->toThrow(StretchException::class, "Failed to delete pipeline 'my-pipeline'");
+});
+
+// ── Inference Endpoint Tests ────────────────────────────
+
+it('can put an inference endpoint', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putInferenceEndpointHandler = fn ($id, $taskType, $body) => [
+        'inference_id' => $id,
+        'task_type' => $taskType,
+    ];
+
+    $result = $client->putInferenceEndpoint('my-embeddings', 'text_embedding', [
+        'service' => 'elasticsearch',
+        'service_settings' => ['model_id' => '.multilingual-e5-small'],
+    ]);
+
+    expect($result['inference_id'])->toBe('my-embeddings')
+        ->and($result['task_type'])->toBe('text_embedding');
+});
+
+it('wraps putInferenceEndpoint exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putInferenceEndpointHandler = function () {
+        throw new RuntimeException('Inference error');
+    };
+
+    expect(fn () => $client->putInferenceEndpoint('test', 'text_embedding', []))
+        ->toThrow(StretchException::class, "Failed to put inference endpoint 'test'");
+});
+
+it('can get an inference endpoint', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getInferenceEndpointHandler = fn ($id) => [
+        'inference_id' => $id,
+        'task_type' => 'text_embedding',
+    ];
+
+    $result = $client->getInferenceEndpoint('my-embeddings');
+
+    expect($result['inference_id'])->toBe('my-embeddings');
+});
+
+it('wraps getInferenceEndpoint exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getInferenceEndpointHandler = function () {
+        throw new RuntimeException('Not found');
+    };
+
+    expect(fn () => $client->getInferenceEndpoint('missing'))
+        ->toThrow(StretchException::class, "Failed to get inference endpoint 'missing'");
+});
+
+it('can delete an inference endpoint', function () {
+    $client = new TestableElasticsearchClient;
+    $client->deleteInferenceEndpointHandler = fn ($id) => ['acknowledged' => true];
+
+    $result = $client->deleteInferenceEndpoint('my-embeddings');
+
+    expect($result['acknowledged'])->toBeTrue();
+});
+
+it('wraps deleteInferenceEndpoint exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->deleteInferenceEndpointHandler = function () {
+        throw new RuntimeException('Delete error');
+    };
+
+    expect(fn () => $client->deleteInferenceEndpoint('test'))
+        ->toThrow(StretchException::class, "Failed to delete inference endpoint 'test'");
+});
+
+// ── ML / Trained Model Tests ────────────────────────────
+
+it('can get trained model stats', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getTrainedModelStatsHandler = fn ($modelId) => [
+        'count' => 1,
+        'trained_model_stats' => [
+            [
+                'model_id' => $modelId,
+                'deployment_stats' => [
+                    'allocation_status' => ['state' => 'fully_allocated'],
+                ],
+            ],
+        ],
+    ];
+
+    $result = $client->getTrainedModelStats('.multilingual-e5-small');
+
+    expect($result['trained_model_stats'][0]['model_id'])->toBe('.multilingual-e5-small')
+        ->and($result['trained_model_stats'][0]['deployment_stats']['allocation_status']['state'])->toBe('fully_allocated');
+});
+
+it('wraps getTrainedModelStats exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getTrainedModelStatsHandler = function () {
+        throw new RuntimeException('Model not found');
+    };
+
+    expect(fn () => $client->getTrainedModelStats('missing-model'))
+        ->toThrow(StretchException::class, "Failed to get trained model stats for 'missing-model'");
 });

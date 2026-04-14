@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use JayI\Stretch\Contracts\ClientContract;
+use JayI\Stretch\Contracts\QueryBuilderContract;
 use JayI\Stretch\Stretch;
 use Mockery as m;
 
@@ -12,7 +13,7 @@ it('can create query builder through stretch facade', function () {
 
     $query = $stretch->query();
 
-    expect($query)->toBeInstanceOf(\JayI\Stretch\Contracts\QueryBuilderContract::class);
+    expect($query)->toBeInstanceOf(QueryBuilderContract::class);
 });
 
 it('can create query builder for specific index', function () {
@@ -21,7 +22,7 @@ it('can create query builder for specific index', function () {
 
     $query = $stretch->index('posts');
 
-    expect($query)->toBeInstanceOf(\JayI\Stretch\Contracts\QueryBuilderContract::class);
+    expect($query)->toBeInstanceOf(QueryBuilderContract::class);
 });
 
 it('can check if index exists', function () {

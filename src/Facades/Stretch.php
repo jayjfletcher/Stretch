@@ -37,6 +37,13 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array putSynonymRule(string $setId, string $ruleId, array $rule, array $options = []) Create or update a synonym rule
  * @method static array getSynonymRule(string $setId, string $ruleId) Get a synonym rule
  * @method static array deleteSynonymRule(string $setId, string $ruleId, array $options = []) Delete a synonym rule
+ * @method static array putPipeline(string $id, array $body) Create or update an ingest pipeline
+ * @method static array getPipeline(string $id) Get an ingest pipeline by ID
+ * @method static array deletePipeline(string $id) Delete an ingest pipeline
+ * @method static array putInferenceEndpoint(string $inferenceId, string $taskType, array $body) Create or update an inference endpoint
+ * @method static array getInferenceEndpoint(string $inferenceId) Get an inference endpoint by ID
+ * @method static array deleteInferenceEndpoint(string $inferenceId) Delete an inference endpoint
+ * @method static array getTrainedModelStats(string $modelId) Get stats for a trained ML model
  *
  * @see \JayI\Stretch\Stretch
  */

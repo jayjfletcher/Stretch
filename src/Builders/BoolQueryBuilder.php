@@ -62,6 +62,11 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     protected int|string|null $minimumShouldMatch = null;
 
     /**
+     * Boost factor for the entire bool query.
+     */
+    protected ?float $boost = null;
+
+    /**
      * Create a new BoolQueryBuilder instance.
      *
      * @param  QueryBuilderContract  $parent  The parent query builder
@@ -188,6 +193,19 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     }
 
     /**
+     * Set a boost factor on the entire bool query.
+     *
+     * @param  float  $boost  The boost factor
+     * @return static Returns the builder instance for method chaining
+     */
+    public function boost(float $boost): static
+    {
+        $this->boost = $boost;
+
+        return $this;
+    }
+
+    /**
      * Build the bool query array.
      *
      * Assembles all clauses into a properly formatted Elasticsearch bool query.
@@ -216,6 +234,10 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
 
         if ($this->minimumShouldMatch !== null) {
             $bool['minimum_should_match'] = $this->minimumShouldMatch;
+        }
+
+        if ($this->boost !== null) {
+            $bool['boost'] = $this->boost;
         }
 
         return [

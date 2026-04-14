@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JayI\Stretch\Contracts;
 
+use JayI\Stretch\Exceptions\StretchException;
+
 /**
  * Contract for Elasticsearch query builders.
  *
@@ -128,19 +130,32 @@ interface QueryBuilderContract
     public function fuzzy(string $field, mixed $value, array $options = []): static;
 
     /**
+     * Add a multi_match query for full-text search across multiple fields.
+     *
+     * @param  string  $query  The search text
+     * @param  array  $fields  Fields to search with optional boosts (e.g. ['title^3', 'description'])
+     * @param  array  $options  Additional options (type, fuzziness, minimum_should_match, etc.)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function multiMatch(string $query, array $fields, array $options = []): static;
+
+    /**
      * Add a top-level kNN search clause for vector similarity search.
      *
      * Can be combined with query clauses (match, bool, etc.) to produce
      * hybrid search — Elasticsearch linearly combines the query and kNN scores.
      *
+     * Pass null for $queryVector when using query_vector_builder in $options
+     * to let Elasticsearch generate the embedding server-side.
+     *
      * @param  string  $field  The dense_vector field to search
-     * @param  array  $queryVector  The query vector
+     * @param  array|null  $queryVector  The query vector, or null when using query_vector_builder
      * @param  int  $k  Number of nearest neighbours to return
      * @param  int|null  $numCandidates  Candidates considered per shard
-     * @param  array  $options  Extra kNN options (boost, filter, similarity, etc.)
+     * @param  array  $options  Extra kNN options (boost, filter, similarity, query_vector_builder, etc.)
      * @return static Returns the builder instance for method chaining
      */
-    public function knn(string $field, array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static;
+    public function knn(string $field, ?array $queryVector, int $k = 10, ?int $numCandidates = null, array $options = []): static;
 
     /**
      * Set the top-level retriever clause for hybrid search.
@@ -204,6 +219,17 @@ interface QueryBuilderContract
     public function highlight(array $fields, array $options = []): static;
 
     /**
+     * Set track_total_hits for accurate total hit counts.
+     *
+     * By default Elasticsearch caps total hits at 10,000. Set to true
+     * for exact counts, or an integer for a custom threshold.
+     *
+     * @param  bool|int  $trackTotalHits  true for exact, int for threshold
+     * @return static Returns the builder instance for method chaining
+     */
+    public function trackTotalHits(bool|int $trackTotalHits = true): static;
+
+    /**
      * Add a named aggregation to the query.
      *
      * @param  string  $name  Name for this aggregation in the response
@@ -211,6 +237,19 @@ interface QueryBuilderContract
      * @return static Returns the builder instance for method chaining
      */
     public function aggregation(string $name, callable $callback): static;
+
+    /**
+     * Add a raw aggregation to the query.
+     *
+     * Escape hatch for aggregation structures not yet covered by the
+     * AggregationBuilder (e.g. filtered aggregations, nested aggs with
+     * multiple levels, stats aggregations).
+     *
+     * @param  string  $name  Name for this aggregation in the response
+     * @param  array  $aggregation  The raw Elasticsearch aggregation array
+     * @return static Returns the builder instance for method chaining
+     */
+    public function rawAggregation(string $name, array $aggregation): static;
 
     /**
      * Add a filter context clause (no scoring, cached).
@@ -232,7 +271,7 @@ interface QueryBuilderContract
      *
      * @return array The Elasticsearch search response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the search fails
+     * @throws StretchException If the search fails
      */
     public function execute(): array;
 
@@ -272,5 +311,4 @@ interface QueryBuilderContract
      * Return the query from
      */
     public function getFrom(): int;
-
 }

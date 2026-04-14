@@ -118,6 +118,123 @@ it('can add aggregations', function () {
     expect($query['aggs']['categories']['terms']['field'])->toBe('category.keyword');
 });
 
+it('can create a multi_match query', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->multiMatch('laptop for work', ['title^3', 'description', 'brand^2']);
+
+    $query = $builder->build();
+
+    expect($query['query']['multi_match']['query'])->toBe('laptop for work')
+        ->and($query['query']['multi_match']['fields'])->toBe(['title^3', 'description', 'brand^2']);
+});
+
+it('can create a multi_match query with options', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->multiMatch('search text', ['name^3', 'description'], [
+        'type' => 'best_fields',
+        'fuzziness' => 'AUTO',
+        'prefix_length' => 2,
+        'minimum_should_match' => '75%',
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['query']['multi_match']['type'])->toBe('best_fields')
+        ->and($query['query']['multi_match']['fuzziness'])->toBe('AUTO')
+        ->and($query['query']['multi_match']['prefix_length'])->toBe(2)
+        ->and($query['query']['multi_match']['minimum_should_match'])->toBe('75%');
+});
+
+it('can set track_total_hits to true', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'Laravel')->trackTotalHits();
+
+    $query = $builder->build();
+
+    expect($query['track_total_hits'])->toBeTrue();
+});
+
+it('can set track_total_hits to an integer threshold', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'Laravel')->trackTotalHits(5000);
+
+    $query = $builder->build();
+
+    expect($query['track_total_hits'])->toBe(5000);
+});
+
+it('does not include track_total_hits when not set', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'Laravel');
+
+    $query = $builder->build();
+
+    expect($query)->not->toHaveKey('track_total_hits');
+});
+
+it('can add raw aggregations', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'Laravel')
+        ->rawAggregation('price_stats', ['stats' => ['field' => 'price']]);
+
+    $query = $builder->build();
+
+    expect($query['aggs']['price_stats'])->toBe(['stats' => ['field' => 'price']]);
+});
+
+it('can add filtered raw aggregations', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->rawAggregation('filtered_brand', [
+        'filter' => ['bool' => ['filter' => [['term' => ['category' => 'Electronics']]]]],
+        'aggs' => [
+            'brand' => [
+                'terms' => ['field' => 'brand', 'size' => 100],
+            ],
+        ],
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['aggs']['filtered_brand'])->toHaveKey('filter')
+        ->and($query['aggs']['filtered_brand'])->toHaveKey('aggs')
+        ->and($query['aggs']['filtered_brand']['aggs']['brand']['terms']['field'])->toBe('brand');
+});
+
+it('can mix aggregation and rawAggregation', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder
+        ->aggregation('categories', fn ($agg) => $agg->terms('category.keyword'))
+        ->rawAggregation('price_stats', ['stats' => ['field' => 'price']]);
+
+    $query = $builder->build();
+
+    expect($query['aggs'])->toHaveKey('categories')
+        ->and($query['aggs'])->toHaveKey('price_stats');
+});
+
+it('includes track_total_hits in retriever body', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder
+        ->trackTotalHits()
+        ->retriever(function ($r) {
+            $r->standard(fn ($q) => $q->match('title', 'Laravel'));
+        });
+
+    $query = $builder->build();
+
+    expect($query['track_total_hits'])->toBeTrue()
+        ->and($query)->toHaveKey('retriever');
+});
+
 it('can create complex nested queries', function () {
     $builder = new ElasticsearchQueryBuilder;
 

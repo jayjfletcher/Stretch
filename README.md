@@ -62,11 +62,12 @@ $results = Stretch::index('orders')
 | Document | Description |
 |----------|-------------|
 | [Configuration](docs/configuration.md) | Connection setup, all config options, env vars, multiple connections |
-| [Queries](docs/queries.md) | All query types: match, term, range, bool, nested, wildcard, fuzzy, semantic |
-| [Aggregations](docs/aggregations.md) | Bucket and metric aggregations, sub-aggregations, ordering |
+| [Queries](docs/queries.md) | All query types: match, multi_match, term, range, bool, nested, wildcard, fuzzy, semantic |
+| [Aggregations](docs/aggregations.md) | Bucket and metric aggregations, stats, raw aggregations, sub-aggregations |
+| [Hybrid Search](docs/hybrid-search.md) | kNN vector search, server-side embeddings, Retriever API, RRF |
 | [Multi-Search](docs/multi-search.md) | Execute multiple queries in a single request |
 | [Caching](docs/caching.md) | Cache setup, TTL, stale-while-revalidate, cache stores |
-| [Index Management](docs/index-management.md) | Index and document CRUD operations, bulk API |
+| [Index Management](docs/index-management.md) | Index/document CRUD, bulk API, pipelines, inference, ML models |
 | [Pagination](docs/pagination.md) | ElasticPaginator usage with Laravel's pagination |
 | [Synonyms](docs/synonyms.md) | Manage synonym sets and rules via the Synonyms API |
 

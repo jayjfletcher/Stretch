@@ -10,6 +10,7 @@ use JayI\Stretch\Client\ElasticsearchClient;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\MultiQueryBuilderContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
+use JayI\Stretch\Exceptions\StretchException;
 
 /**
  * Stretch - Laravel Elasticsearch Query Builder
@@ -143,7 +144,7 @@ class Stretch
      * @param  array  $settings  Optional index settings and mappings
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If index creation fails
+     * @throws StretchException If index creation fails
      *
      * @example
      * ```php
@@ -166,7 +167,7 @@ class Stretch
      * @param  string  $index  The name of the index to delete
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If index deletion fails
+     * @throws StretchException If index deletion fails
      */
     public function deleteIndex(string $index): array
     {
@@ -181,7 +182,7 @@ class Stretch
      *
      * @return array The cluster health response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If health check fails
+     * @throws StretchException If health check fails
      */
     public function health(): array
     {
@@ -195,7 +196,7 @@ class Stretch
      *
      * @return array Array of index information
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If retrieving indices fails
+     * @throws StretchException If retrieving indices fails
      */
     public function indices(): array
     {
@@ -210,7 +211,7 @@ class Stretch
      * @param  array  $operations  Array of bulk operations (action/metadata and source pairs)
      * @return array The bulk response with results for each operation
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If bulk operation fails
+     * @throws StretchException If bulk operation fails
      *
      * @example
      * ```php
@@ -238,7 +239,7 @@ class Stretch
      * @param  string|null  $id  Optional document ID (auto-generated if not provided)
      * @return array The index response including the document ID and version
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If indexing fails
+     * @throws StretchException If indexing fails
      *
      * @example
      * ```php
@@ -273,7 +274,7 @@ class Stretch
      * @param  array  $document  The fields to update
      * @return array The update response including the new version
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If update fails
+     * @throws StretchException If update fails
      *
      * @example
      * ```php
@@ -298,7 +299,7 @@ class Stretch
      * @param  string  $id  The document ID to delete
      * @return array The delete response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If deletion fails
+     * @throws StretchException If deletion fails
      */
     public function deleteDocument(string $index, string $id): array
     {
@@ -315,7 +316,7 @@ class Stretch
      * @param  string  $id  The document ID to retrieve
      * @return array The document including _source, _id, and metadata
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If document not found or retrieval fails
+     * @throws StretchException If document not found or retrieval fails
      */
     public function getDocument(string $index, string $id): array
     {
@@ -334,7 +335,7 @@ class Stretch
      * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      *
      * @example
      * ```php
@@ -356,7 +357,7 @@ class Stretch
      * @param  array  $options  Optional parameters (e.g. ['from' => 0, 'size' => 10])
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonym(string $id, array $options = []): array
     {
@@ -369,7 +370,7 @@ class Stretch
      * @param  string  $id  The synonym set id
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function deleteSynonym(string $id): array
     {
@@ -382,7 +383,7 @@ class Stretch
      * @param  array  $options  Optional parameters (e.g. ['from' => 0, 'size' => 10])
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonymsSets(array $options = []): array
     {
@@ -398,7 +399,7 @@ class Stretch
      * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      *
      * @example
      * ```php
@@ -417,7 +418,7 @@ class Stretch
      * @param  string  $ruleId  The synonym rule id
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function getSynonymRule(string $setId, string $ruleId): array
     {
@@ -432,10 +433,110 @@ class Stretch
      * @param  array  $options  Optional extra parameters (e.g. ['refresh' => true])
      * @return array The Elasticsearch response
      *
-     * @throws \JayI\Stretch\Exceptions\StretchException If the operation fails
+     * @throws StretchException If the operation fails
      */
     public function deleteSynonymRule(string $setId, string $ruleId, array $options = []): array
     {
         return $this->client->deleteSynonymRule($setId, $ruleId, $options);
+    }
+
+    // ── Ingest Pipelines ────────────────────────────────────
+
+    /**
+     * Create or update an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @param  array  $body  Pipeline definition (description, processors, etc.)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putPipeline(string $id, array $body): array
+    {
+        return $this->client->putPipeline($id, $body);
+    }
+
+    /**
+     * Get an ingest pipeline by ID.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The pipeline definition
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getPipeline(string $id): array
+    {
+        return $this->client->getPipeline($id);
+    }
+
+    /**
+     * Delete an ingest pipeline.
+     *
+     * @param  string  $id  The pipeline ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deletePipeline(string $id): array
+    {
+        return $this->client->deletePipeline($id);
+    }
+
+    // ── Inference Endpoints ─────────────────────────────────
+
+    /**
+     * Create or update an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @param  string  $taskType  The task type (e.g. 'text_embedding')
+     * @param  array  $body  Endpoint configuration
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putInferenceEndpoint(string $inferenceId, string $taskType, array $body): array
+    {
+        return $this->client->putInferenceEndpoint($inferenceId, $taskType, $body);
+    }
+
+    /**
+     * Get an inference endpoint by ID.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The endpoint configuration
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getInferenceEndpoint(string $inferenceId): array
+    {
+        return $this->client->getInferenceEndpoint($inferenceId);
+    }
+
+    /**
+     * Delete an inference endpoint.
+     *
+     * @param  string  $inferenceId  The inference endpoint ID
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteInferenceEndpoint(string $inferenceId): array
+    {
+        return $this->client->deleteInferenceEndpoint($inferenceId);
+    }
+
+    // ── ML / Trained Models ─────────────────────────────────
+
+    /**
+     * Get stats for a trained ML model.
+     *
+     * @param  string  $modelId  The trained model ID
+     * @return array The model stats including deployment status
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTrainedModelStats(string $modelId): array
+    {
+        return $this->client->getTrainedModelStats($modelId);
     }
 }

@@ -70,6 +70,101 @@ it('emits an array of knn clauses when multiple are added', function () {
     expect($query['knn'][1]['field'])->toBe('body_vector');
 });
 
+it('builds kNN with query_vector_builder when vector is null', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->knn('embedding', null, k: 10, numCandidates: 150, options: [
+        'query_vector_builder' => [
+            'text_embedding' => [
+                'model_id' => 'my-embeddings',
+                'model_text' => 'search query',
+            ],
+        ],
+        'boost' => 0.3,
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['knn']['field'])->toBe('embedding')
+        ->and($query['knn'])->not->toHaveKey('query_vector')
+        ->and($query['knn']['query_vector_builder']['text_embedding']['model_id'])->toBe('my-embeddings')
+        ->and($query['knn']['query_vector_builder']['text_embedding']['model_text'])->toBe('search query')
+        ->and($query['knn']['k'])->toBe(10)
+        ->and($query['knn']['num_candidates'])->toBe(150)
+        ->and($query['knn']['boost'])->toBe(0.3);
+});
+
+it('omits query_vector when query_vector_builder is in options even with non-null vector', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->knn('embedding', [0.1, 0.2], k: 5, options: [
+        'query_vector_builder' => [
+            'text_embedding' => ['model_id' => 'test', 'model_text' => 'query'],
+        ],
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['knn'])->not->toHaveKey('query_vector')
+        ->and($query['knn'])->toHaveKey('query_vector_builder');
+});
+
+it('includes query_vector when vector is provided without query_vector_builder', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->knn('vec', [0.1, 0.2, 0.3], k: 5);
+
+    $query = $builder->build();
+
+    expect($query['knn']['query_vector'])->toBe([0.1, 0.2, 0.3])
+        ->and($query['knn'])->not->toHaveKey('query_vector_builder');
+});
+
+it('builds hybrid search with multiMatch and kNN using query_vector_builder', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder
+        ->multiMatch('laptop for work', ['name^3', 'description'], [
+            'type' => 'best_fields',
+            'fuzziness' => 'AUTO',
+        ])
+        ->knn('embedding', null, k: 48, numCandidates: 150, options: [
+            'query_vector_builder' => [
+                'text_embedding' => [
+                    'model_id' => 'product-embeddings',
+                    'model_text' => 'laptop for work',
+                ],
+            ],
+            'boost' => 0.3,
+        ])
+        ->trackTotalHits();
+
+    $query = $builder->build();
+
+    expect($query['query']['multi_match']['query'])->toBe('laptop for work')
+        ->and($query['knn']['field'])->toBe('embedding')
+        ->and($query['knn'])->not->toHaveKey('query_vector')
+        ->and($query['knn']['query_vector_builder'])->toBeArray()
+        ->and($query['track_total_hits'])->toBeTrue();
+});
+
+it('retriever knn supports null vector with query_vector_builder', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->retriever(function ($r) {
+        $r->knn('embedding', null, k: 10, options: [
+            'query_vector_builder' => [
+                'text_embedding' => ['model_id' => 'test', 'model_text' => 'query'],
+            ],
+        ]);
+    });
+
+    $query = $builder->build();
+
+    expect($query['retriever']['knn'])->not->toHaveKey('query_vector')
+        ->and($query['retriever']['knn']['query_vector_builder'])->toBeArray();
+});
+
 it('builds a standard retriever', function () {
     $builder = new ElasticsearchQueryBuilder;
 
