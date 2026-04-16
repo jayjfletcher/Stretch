@@ -51,6 +51,7 @@ The query builder uses a builder pattern with internal arrays (`$query`, `$aggre
 - `knn()` - k-nearest-neighbor vector search (supports both literal vectors and `query_vector_builder` for server-side embeddings)
 - `retriever()` - Modern ES 8.14+ retriever API (standard, kNN, RRF)
 - `filter()` - Filter context (no scoring, cached)
+- `postFilter()` - Applied after aggregations; narrows hits without affecting aggregation buckets (faceted search)
 
 ### kNN with Server-Side Embeddings
 
@@ -83,6 +84,18 @@ The `BoolQueryBuilder` supports a `boost()` method to set a boost factor on the 
         ->minimumShouldMatch(1)
         ->boost(0.7);
 })
+```
+
+### Post Filter
+
+Use `postFilter()` when you want to narrow the returned hits without affecting aggregation buckets (faceted search). Aggregations run against the full query result set; hits are filtered after. Multiple calls are combined under `bool.filter`:
+
+```php
+Stretch::index('products')
+    ->match('name', 'shoe')
+    ->aggregation('colors', fn ($agg) => $agg->terms('color.keyword'))
+    ->postFilter(fn ($q) => $q->term('color.keyword', 'red'))
+    ->execute();
 ```
 
 ### Track Total Hits
