@@ -86,6 +86,13 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     protected array $filters = [];
 
     /**
+     * Post-filter clauses applied after aggregations.
+     *
+     * @var array<int, array>
+     */
+    protected array $postFilters = [];
+
+    /**
      * Whether query caching is enabled.
      */
     protected bool $cache = false;
@@ -832,6 +839,39 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Add a post_filter clause applied after aggregations.
+     *
+     * Post-filters narrow the returned hits without affecting aggregation
+     * buckets. This is the standard approach for faceted search where you
+     * want facet counts to reflect the unfiltered result set while still
+     * scoping the visible documents.
+     *
+     * Calling this multiple times combines clauses under `bool.filter` inside
+     * the `post_filter` object.
+     *
+     * @param  callable  $callback  Callback receiving a query builder for the post_filter
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * // Faceted search — aggregations see all colors, but hits are narrowed
+     * Stretch::index('products')
+     *     ->match('name', 'shoe')
+     *     ->aggregation('colors', fn($agg) => $agg->terms('color.keyword'))
+     *     ->postFilter(fn($q) => $q->term('color.keyword', 'red'))
+     *     ->execute();
+     * ```
+     */
+    public function postFilter(callable $callback): static
+    {
+        $postFilterQuery = new ElasticsearchQueryBuilder($this->client, $this->manager);
+        $callback($postFilterQuery);
+        $this->postFilters[] = $postFilterQuery->build()['query'];
+
+        return $this;
+    }
+
+    /**
      * Build the final Elasticsearch query array.
      *
      * Assembles all query clauses, filters, aggregations, sorting,
@@ -868,6 +908,10 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
 
             if ($this->trackTotalHits !== null) {
                 $body['track_total_hits'] = $this->trackTotalHits;
+            }
+
+            if (! empty($this->postFilters)) {
+                $body['post_filter'] = $this->buildPostFilter();
             }
 
             return $body;
@@ -931,7 +975,26 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
             $body['track_total_hits'] = $this->trackTotalHits;
         }
 
+        if (! empty($this->postFilters)) {
+            $body['post_filter'] = $this->buildPostFilter();
+        }
+
         return $body;
+    }
+
+    /**
+     * Build the post_filter clause from accumulated post-filter queries.
+     *
+     * A single clause is emitted directly; multiple clauses are combined
+     * under `bool.filter` to preserve the AND semantics of filter context.
+     */
+    protected function buildPostFilter(): array
+    {
+        if (count($this->postFilters) === 1) {
+            return $this->postFilters[0];
+        }
+
+        return ['bool' => ['filter' => $this->postFilters]];
     }
 
     /**

@@ -260,6 +260,18 @@ interface QueryBuilderContract
     public function filter(callable $callback): static;
 
     /**
+     * Add a post_filter clause applied after aggregations.
+     *
+     * Unlike `filter()`, post_filter runs after the main query and aggregations,
+     * so aggregation buckets reflect the full query results while hits are
+     * narrowed. Useful for faceted search where filters should not skew facets.
+     *
+     * @param  callable  $callback  Callback receiving a query builder for the post_filter
+     * @return static Returns the builder instance for method chaining
+     */
+    public function postFilter(callable $callback): static;
+
+    /**
      * Build the final Elasticsearch query array.
      *
      * @return array The complete Elasticsearch query body
