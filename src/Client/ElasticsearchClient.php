@@ -135,6 +135,23 @@ class ElasticsearchClient implements ClientContract
     }
 
     /**
+     * Get the mapping for a single index.
+     *
+     * @param  string  $index  The index name
+     * @return array The mapping response keyed by index name
+     *
+     * @throws StretchException If retrieving the mapping fails
+     */
+    public function getMapping(string $index): array
+    {
+        try {
+            return $this->client->indices()->getMapping(['index' => $index])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get mapping for {$index}: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
      * Check if an index exists.
      *
      * @param  string  $index  The index name to check
@@ -451,6 +468,18 @@ class ElasticsearchClient implements ClientContract
         }
     }
 
+    public function fieldCaps(string $index, array $fields): array
+    {
+        try {
+            return $this->client->fieldCaps([
+                'index' => $index,
+                'fields' => implode(',', $fields),
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to fetch field caps for '$index': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
     // ── Inference Endpoints ─────────────────────────────────
 
     /**
@@ -532,6 +561,92 @@ class ElasticsearchClient implements ClientContract
             ])->asArray();
         } catch (Exception $exception) {
             throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    // ── Mapping / Reindex / Aliases / Tasks ─────────────────
+
+    /**
+     * Update the mapping of an existing index.
+     *
+     * @param  string  $index  The index name
+     * @param  array  $mapping  Mapping body (e.g. ['properties' => [...]])
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putMapping(string $index, array $mapping): array
+    {
+        try {
+            return $this->client->indices()->putMapping([
+                'index' => $index,
+                'body' => $mapping,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put mapping for '{$index}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Copy documents from one index to another via the _reindex API.
+     *
+     * @param  string  $source  Source index name
+     * @param  string  $dest  Destination index name
+     * @param  array{wait_for_completion?: bool, body_extras?: array}  $options
+     * @return array The Elasticsearch response (contains 'task' key when async)
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function reindex(string $source, string $dest, array $options = []): array
+    {
+        try {
+            $body = [
+                'source' => ['index' => $source],
+                'dest' => ['index' => $dest],
+            ] + ($options['body_extras'] ?? []);
+
+            return $this->client->reindex([
+                'wait_for_completion' => $options['wait_for_completion'] ?? false,
+                'body' => $body,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to reindex '{$source}' → '{$dest}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Atomically apply a batch of alias actions.
+     *
+     * @param  array  $actions  List of alias actions
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function updateAliases(array $actions): array
+    {
+        try {
+            return $this->client->indices()->updateAliases([
+                'body' => ['actions' => $actions],
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to update aliases: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    /**
+     * Get the status of an async task.
+     *
+     * @param  string  $id  The task id
+     * @return array The task status response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTask(string $id): array
+    {
+        try {
+            return $this->client->tasks()->get(['task_id' => $id])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get task '{$id}': {$exception->getMessage()}", 0, $exception);
         }
     }
 

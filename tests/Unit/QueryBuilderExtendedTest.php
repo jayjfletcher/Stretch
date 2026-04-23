@@ -80,6 +80,26 @@ it('can create a match phrase query with options', function () {
     expect($query['query']['match_phrase']['content']['slop'])->toBe(2);
 });
 
+it('can create a match_all query', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->matchAll();
+
+    $query = $builder->build();
+
+    expect($query['query']['match_all'])->toEqual((object) []);
+});
+
+it('can create a match_all query with options', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->matchAll(['boost' => 1.2]);
+
+    $query = $builder->build();
+
+    expect($query['query']['match_all'])->toEqual((object) ['boost' => 1.2]);
+});
+
 it('can add highlight configuration', function () {
     $builder = new ElasticsearchQueryBuilder;
 

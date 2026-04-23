@@ -50,6 +50,14 @@ class TestableElasticsearchClient extends ElasticsearchClient
 
     public ?Closure $getTrainedModelStatsHandler = null;
 
+    public ?Closure $putMappingHandler = null;
+
+    public ?Closure $reindexHandler = null;
+
+    public ?Closure $updateAliasesHandler = null;
+
+    public ?Closure $getTaskHandler = null;
+
     public array $loggedMessages = [];
 
     public array $loggedSlowQueries = [];
@@ -266,6 +274,62 @@ class TestableElasticsearchClient extends ElasticsearchClient
             throw $e;
         } catch (Exception $exception) {
             throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function putMapping(string $index, array $mapping): array
+    {
+        try {
+            if ($this->putMappingHandler) {
+                return ($this->putMappingHandler)($index, $mapping);
+            }
+            throw new Exception('No putMapping handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to put mapping for '{$index}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function reindex(string $source, string $dest, array $options = []): array
+    {
+        try {
+            if ($this->reindexHandler) {
+                return ($this->reindexHandler)($source, $dest, $options);
+            }
+            throw new Exception('No reindex handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to reindex '{$source}' → '{$dest}': {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function updateAliases(array $actions): array
+    {
+        try {
+            if ($this->updateAliasesHandler) {
+                return ($this->updateAliasesHandler)($actions);
+            }
+            throw new Exception('No updateAliases handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to update aliases: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
+    public function getTask(string $id): array
+    {
+        try {
+            if ($this->getTaskHandler) {
+                return ($this->getTaskHandler)($id);
+            }
+            throw new Exception('No getTask handler set');
+        } catch (StretchException $e) {
+            throw $e;
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to get task '{$id}': {$exception->getMessage()}", 0, $exception);
         }
     }
 }
@@ -630,4 +694,136 @@ it('wraps getTrainedModelStats exceptions in StretchException', function () {
 
     expect(fn () => $client->getTrainedModelStats('missing-model'))
         ->toThrow(StretchException::class, "Failed to get trained model stats for 'missing-model'");
+});
+
+// ── putMapping ──────────────────────────────────────────
+
+it('can put a mapping for an index', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putMappingHandler = function (string $index, array $mapping) {
+        expect($index)->toBe('posts')
+            ->and($mapping)->toHaveKey('properties.new_field');
+
+        return ['acknowledged' => true];
+    };
+
+    $result = $client->putMapping('posts', [
+        'properties' => ['new_field' => ['type' => 'keyword']],
+    ]);
+
+    expect($result['acknowledged'])->toBeTrue();
+});
+
+it('wraps putMapping exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->putMappingHandler = function () {
+        throw new RuntimeException('mapper_parsing_exception');
+    };
+
+    expect(fn () => $client->putMapping('posts', ['properties' => []]))
+        ->toThrow(StretchException::class, "Failed to put mapping for 'posts'");
+});
+
+// ── reindex ─────────────────────────────────────────────
+
+it('can reindex from one index to another asynchronously by default', function () {
+    $client = new TestableElasticsearchClient;
+    $client->reindexHandler = function (string $source, string $dest, array $options) {
+        expect($source)->toBe('posts_v1')
+            ->and($dest)->toBe('posts_v2')
+            ->and($options)->toBe([]);
+
+        return ['task' => 'node-1:123'];
+    };
+
+    $result = $client->reindex('posts_v1', 'posts_v2');
+
+    expect($result['task'])->toBe('node-1:123');
+});
+
+it('passes wait_for_completion and body_extras to reindex', function () {
+    $client = new TestableElasticsearchClient;
+    $client->reindexHandler = function (string $source, string $dest, array $options) {
+        expect($options['wait_for_completion'])->toBeTrue()
+            ->and($options['body_extras'])->toBe(['conflicts' => 'proceed']);
+
+        return ['total' => 42];
+    };
+
+    $result = $client->reindex('a', 'b', [
+        'wait_for_completion' => true,
+        'body_extras' => ['conflicts' => 'proceed'],
+    ]);
+
+    expect($result['total'])->toBe(42);
+});
+
+it('wraps reindex exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->reindexHandler = function () {
+        throw new RuntimeException('version_conflict');
+    };
+
+    expect(fn () => $client->reindex('a', 'b'))
+        ->toThrow(StretchException::class, "Failed to reindex 'a' → 'b'");
+});
+
+// ── updateAliases ───────────────────────────────────────
+
+it('can apply alias actions atomically', function () {
+    $client = new TestableElasticsearchClient;
+    $client->updateAliasesHandler = function (array $actions) {
+        expect($actions)->toBe([
+            ['remove' => ['index' => 'posts_v1', 'alias' => 'posts']],
+            ['add' => ['index' => 'posts_v2', 'alias' => 'posts']],
+        ]);
+
+        return ['acknowledged' => true];
+    };
+
+    $result = $client->updateAliases([
+        ['remove' => ['index' => 'posts_v1', 'alias' => 'posts']],
+        ['add' => ['index' => 'posts_v2', 'alias' => 'posts']],
+    ]);
+
+    expect($result['acknowledged'])->toBeTrue();
+});
+
+it('wraps updateAliases exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->updateAliasesHandler = function () {
+        throw new RuntimeException('alias exists');
+    };
+
+    expect(fn () => $client->updateAliases([]))
+        ->toThrow(StretchException::class, 'Failed to update aliases');
+});
+
+// ── getTask ─────────────────────────────────────────────
+
+it('can get an async task status', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getTaskHandler = function (string $id) {
+        expect($id)->toBe('node-1:456');
+
+        return [
+            'completed' => false,
+            'task' => ['status' => ['total' => 100, 'updated' => 30, 'created' => 0]],
+        ];
+    };
+
+    $result = $client->getTask('node-1:456');
+
+    expect($result['completed'])->toBeFalse()
+        ->and($result['task']['status']['total'])->toBe(100);
+});
+
+it('wraps getTask exceptions in StretchException', function () {
+    $client = new TestableElasticsearchClient;
+    $client->getTaskHandler = function () {
+        throw new RuntimeException('task not found');
+    };
+
+    expect(fn () => $client->getTask('bad-id'))
+        ->toThrow(StretchException::class, "Failed to get task 'bad-id'");
 });

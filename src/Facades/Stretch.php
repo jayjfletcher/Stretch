@@ -25,6 +25,7 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array deleteIndex(string $index) Delete an index
  * @method static array health() Get cluster health information
  * @method static array indices() Get all indices
+ * @method static array getMapping(string $index) Get the mapping for a single index
  * @method static array bulk(array $operations) Execute bulk operations
  * @method static array indexDocument(string $index, array $document, ?string $id = null) Index a document
  * @method static array updateDocument(string $index, string $id, array $document) Update a document

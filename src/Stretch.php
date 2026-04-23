@@ -204,6 +204,19 @@ class Stretch
     }
 
     /**
+     * Get the mapping for a single index.
+     *
+     * @param  string  $index  The index name
+     * @return array The mapping response keyed by index name
+     *
+     * @throws StretchException If retrieving the mapping fails
+     */
+    public function getMapping(string $index): array
+    {
+        return $this->client->getMapping($index);
+    }
+
+    /**
      * Perform bulk index, update, or delete operations.
      *
      * Efficiently execute multiple operations in a single request.
@@ -482,6 +495,17 @@ class Stretch
         return $this->client->deletePipeline($id);
     }
 
+    /**
+     * Run a `_field_caps` request for the given fields on an index.
+     *
+     * @param  list<string>  $fields
+     * @return array The raw `_field_caps` response
+     */
+    public function fieldCaps(string $index, array $fields): array
+    {
+        return $this->client->fieldCaps($index, $fields);
+    }
+
     // ── Inference Endpoints ─────────────────────────────────
 
     /**
@@ -538,5 +562,83 @@ class Stretch
     public function getTrainedModelStats(string $modelId): array
     {
         return $this->client->getTrainedModelStats($modelId);
+    }
+
+    // ── Mapping / Reindex / Aliases / Tasks ─────────────────
+
+    /**
+     * Update the mapping of an existing index.
+     *
+     * Use for additive, non-breaking changes. Breaking changes require a reindex.
+     *
+     * @param  string  $index  The index name
+     * @param  array  $mapping  Mapping body (e.g. ['properties' => [...]])
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::putMapping('posts', ['properties' => ['new_field' => ['type' => 'keyword']]]);
+     * ```
+     */
+    public function putMapping(string $index, array $mapping): array
+    {
+        return $this->client->putMapping($index, $mapping);
+    }
+
+    /**
+     * Copy documents from one index to another via _reindex. Defaults to async.
+     *
+     * @param  string  $source  Source index name
+     * @param  string  $dest  Destination index name
+     * @param  array{wait_for_completion?: bool, body_extras?: array}  $options
+     * @return array The Elasticsearch response (contains 'task' key when async)
+     *
+     * @throws StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * $response = Stretch::reindex('posts_v1', 'posts_v2');
+     * $taskId = $response['task'];
+     * ```
+     */
+    public function reindex(string $source, string $dest, array $options = []): array
+    {
+        return $this->client->reindex($source, $dest, $options);
+    }
+
+    /**
+     * Atomically apply a batch of alias actions.
+     *
+     * @param  array  $actions  List of alias actions
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::updateAliases([
+     *     ['remove' => ['index' => 'posts_v1', 'alias' => 'posts']],
+     *     ['add' => ['index' => 'posts_v2', 'alias' => 'posts']],
+     * ]);
+     * ```
+     */
+    public function updateAliases(array $actions): array
+    {
+        return $this->client->updateAliases($actions);
+    }
+
+    /**
+     * Get the status of an async task (e.g. a long-running _reindex).
+     *
+     * @param  string  $id  The task id
+     * @return array The task status response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTask(string $id): array
+    {
+        return $this->client->getTask($id);
     }
 }

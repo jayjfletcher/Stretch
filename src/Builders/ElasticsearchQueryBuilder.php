@@ -243,6 +243,31 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Add a match_all query that matches every document.
+     *
+     * Useful as a default query, for paginating an entire index, or as a
+     * placeholder inside bool clauses. Pass options such as `boost` to
+     * influence scoring.
+     *
+     * @param  array  $options  Additional options (e.g. ['boost' => 1.2])
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $builder->matchAll();
+     * $builder->matchAll(['boost' => 1.2]);
+     * ```
+     */
+    public function matchAll(array $options = []): static
+    {
+        $this->addQueryProtected([
+            'match_all' => (object) $options,
+        ]);
+
+        return $this;
+    }
+
+    /**
      * Add a multi_match query for full-text search across multiple fields.
      *
      * @param  string  $query  The search text

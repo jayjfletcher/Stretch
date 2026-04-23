@@ -75,6 +75,16 @@ interface ClientContract
     public function indices(): array;
 
     /**
+     * Get the mapping for a single index.
+     *
+     * @param  string  $index  The index name
+     * @return array The mapping (under `mappings.properties`, matching Elasticsearch's response shape)
+     *
+     * @throws StretchException If retrieving the mapping fails
+     */
+    public function getMapping(string $index): array;
+
+    /**
      * Check if an index exists.
      *
      * @param  string  $index  The index name to check
@@ -244,6 +254,17 @@ interface ClientContract
      */
     public function deletePipeline(string $id): array;
 
+    /**
+     * Run a `_field_caps` request for the given fields on an index.
+     *
+     * @param  string  $index  Index or alias name
+     * @param  list<string>  $fields  Field patterns (e.g. `["attributes.*"]`)
+     * @return array The raw `_field_caps` response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function fieldCaps(string $index, array $fields): array;
+
     // ── Inference Endpoints ─────────────────────────────────
 
     /**
@@ -289,4 +310,54 @@ interface ClientContract
      * @throws StretchException If the operation fails
      */
     public function getTrainedModelStats(string $modelId): array;
+
+    // ── Mapping / Reindex / Aliases / Tasks ─────────────────
+
+    /**
+     * Update the mapping of an existing index.
+     *
+     * Only supports additive, non-breaking mapping changes. Breaking changes
+     * (field type changes, removals, semantic_text additions) require a reindex.
+     *
+     * @param  string  $index  The index name
+     * @param  array  $mapping  Mapping body (e.g. ['properties' => [...]])
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function putMapping(string $index, array $mapping): array;
+
+    /**
+     * Copy documents from one index into another via the _reindex API.
+     *
+     * @param  string  $source  Source index name
+     * @param  string  $dest  Destination index name
+     * @param  array  $options  Supported keys:
+     *                          - 'wait_for_completion' (bool, default false) — run async and return a task id
+     *                          - 'body_extras' (array) — merged into the reindex request body (e.g. script, conflicts)
+     * @return array The Elasticsearch response (contains 'task' key when async)
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function reindex(string $source, string $dest, array $options = []): array;
+
+    /**
+     * Atomically apply a batch of alias actions.
+     *
+     * @param  array  $actions  List of actions (e.g. [['add' => ['index' => 'x', 'alias' => 'a']]])
+     * @return array The Elasticsearch response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function updateAliases(array $actions): array;
+
+    /**
+     * Get the status of an async task (e.g. a long-running _reindex).
+     *
+     * @param  string  $id  The task id returned by the async operation
+     * @return array The task status response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function getTask(string $id): array;
 }
