@@ -41,4 +41,14 @@ interface MultiQueryBuilderContract
      * @return array The msearch body array
      */
     public function toArray(): array;
+
+    /**
+     * Get the parameters sent to Elasticsearch on the most recent execute().
+     *
+     * Returns the `['body' => ...]` payload last dispatched to `_msearch`,
+     * or null if execute() has not yet run on this builder instance.
+     *
+     * @return array|null The last executed msearch parameters, or null if never executed
+     */
+    public function getLastQuery(): ?array;
 }

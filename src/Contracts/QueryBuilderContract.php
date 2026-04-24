@@ -169,6 +169,19 @@ interface QueryBuilderContract
     public function retriever(callable $callback): static;
 
     /**
+     * Add a rank_feature query to boost by a numeric feature field.
+     *
+     * Operates on `rank_feature` or `rank_features` mapped fields. Pass a
+     * score function via $options (`saturation`, `log`, `sigmoid`, or
+     * `linear` — the default) and/or a `boost` factor.
+     *
+     * @param  string  $field  The rank_feature or rank_features field
+     * @param  array  $options  Score function config and/or boost
+     * @return static Returns the builder instance for method chaining
+     */
+    public function rankFeature(string $field, array $options = []): static;
+
+    /**
      * Add an exists query to find documents with a field value.
      *
      * @param  string  $field  The field that must exist
@@ -228,6 +241,32 @@ interface QueryBuilderContract
      * @return static Returns the builder instance for method chaining
      */
     public function trackTotalHits(bool|int $trackTotalHits = true): static;
+
+    /**
+     * Enable the Search Profile API for this request.
+     *
+     * Adds `profile: true` to the search body so Elasticsearch returns
+     * detailed timing and execution info under a `profile` key in the
+     * response. Useful for diagnosing slow queries.
+     *
+     * @param  bool  $profile  Whether to enable profiling (default true)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function profile(bool $profile = true): static;
+
+    /**
+     * Collapse hits by a single-valued field.
+     *
+     * Returns at most one hit per unique value of the field. Supports
+     * `inner_hits` for retrieving additional hits per collapsed group.
+     * Pass a string for a simple collapse, or a full config array.
+     *
+     * @param  string|array  $field  Field name, or a full collapse config array
+     * @param  array|null  $innerHits  Optional inner_hits config (object or list of objects)
+     * @param  int|null  $maxConcurrentGroupSearches  Concurrency limit for inner_hits group searches
+     * @return static Returns the builder instance for method chaining
+     */
+    public function collapse(string|array $field, ?array $innerHits = null, ?int $maxConcurrentGroupSearches = null): static;
 
     /**
      * Add a named aggregation to the query.
@@ -293,6 +332,16 @@ interface QueryBuilderContract
      * @return array The complete Elasticsearch query body
      */
     public function toArray(): array;
+
+    /**
+     * Get the parameters sent to Elasticsearch on the most recent execute().
+     *
+     * Returns the `['index' => ..., 'body' => ...]` payload last dispatched
+     * to the client, or null if execute() has not yet run on this builder.
+     *
+     * @return array|null The last executed query parameters, or null if never executed
+     */
+    public function getLastQuery(): ?array;
 
     /**
      * Add a raw query clause to the builder.

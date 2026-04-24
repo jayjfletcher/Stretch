@@ -128,6 +128,43 @@ it('toArray returns same as build', function () {
     expect($builder->toArray())->toBe($builder->build());
 });
 
+it('getLastQuery returns null before execute', function () {
+    $builder = new MultiQueryBuilder;
+
+    expect($builder->getLastQuery())->toBeNull();
+});
+
+it('captures the last msearch payload sent to the client', function () {
+    $mockClient = m::mock(ClientContract::class);
+
+    $mockClient->shouldReceive('msearch')
+        ->once()
+        ->andReturn(['responses' => [['hits' => []], ['hits' => []]]]);
+
+    $builder = new MultiQueryBuilder($mockClient);
+
+    $builder
+        ->add('a_posts', fn ($q) => $q->index('posts')->match('title', 'Laravel'))
+        ->add('b_users', fn ($q) => $q->index('users')->term('active', true))
+        ->execute();
+
+    $last = $builder->getLastQuery();
+
+    expect($last)->toBeArray();
+    expect($last['body'])->toHaveCount(4);
+    expect($last['body'][0])->toBe(['index' => 'posts']);
+    expect($last['body'][1]['query']['match']['title']['query'])->toBe('Laravel');
+    expect($last['body'][2])->toBe(['index' => 'users']);
+});
+
+it('records an empty body when executing with no queries', function () {
+    $builder = new MultiQueryBuilder(m::mock(ClientContract::class));
+
+    $builder->execute();
+
+    expect($builder->getLastQuery())->toBe(['body' => []]);
+});
+
 it('supports complex queries with size and sort', function () {
     $builder = new MultiQueryBuilder;
 

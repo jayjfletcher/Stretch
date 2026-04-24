@@ -118,6 +118,30 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     protected bool|int|null $trackTotalHits = null;
 
     /**
+     * Whether to enable the Search Profile API for this request.
+     */
+    protected ?bool $profile = null;
+
+    /**
+     * Field collapse configuration.
+     *
+     * When set, produces a `collapse` clause in the request body that groups
+     * hits by a single-valued field and returns one hit per group.
+     */
+    protected ?array $collapse = null;
+
+    /**
+     * The parameters sent to the client on the most recent execute() call.
+     *
+     * Contains the `index` and `body` keys exactly as they were passed to
+     * the Elasticsearch client — useful for debugging and logging. Null
+     * until the first execute() on this builder instance.
+     *
+     * @var array|null
+     */
+    protected ?array $lastQuery = null;
+
+    /**
      * Create a new ElasticsearchQueryBuilder instance.
      *
      * @param  ClientContract|null  $client  The Elasticsearch client for query execution
@@ -630,6 +654,53 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Add a rank_feature query to boost by a numeric feature field.
+     *
+     * Operates on `rank_feature` or `rank_features` mapped fields and boosts
+     * matching documents using one of four score functions: `saturation`,
+     * `log`, `sigmoid`, or `linear` (default). Typically used inside a bool
+     * query's `should` clauses to blend relevance signals like pagerank,
+     * recency, or popularity into the score.
+     *
+     * Pass the score-function config via $options. Examples:
+     *  - ['saturation' => ['pivot' => 8]]
+     *  - ['log' => ['scaling_factor' => 4]]
+     *  - ['sigmoid' => ['pivot' => 7, 'exponent' => 0.6]]
+     *  - ['linear' => new \stdClass] (or omit — linear is the default)
+     *  - ['boost' => 2.5] (stackable with any of the above)
+     *
+     * @param  string  $field  The rank_feature or rank_features field
+     * @param  array  $options  Score function config and/or boost
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * // Saturation boost on a pagerank feature
+     * $builder->rankFeature('pagerank', ['saturation' => ['pivot' => 8]]);
+     *
+     * // Default linear scoring with a boost
+     * $builder->rankFeature('popularity', ['boost' => 2.0]);
+     *
+     * // Typical usage inside a bool query
+     * $builder->bool(function ($bool) {
+     *     $bool->must(fn ($q) => $q->match('content', 'laravel'))
+     *         ->should(fn ($q) => $q->rankFeature('pagerank', ['saturation' => ['pivot' => 8]]))
+     *         ->should(fn ($q) => $q->rankFeature('url_length', ['log' => ['scaling_factor' => 4]]));
+     * });
+     * ```
+     */
+    public function rankFeature(string $field, array $options = []): static
+    {
+        $rankFeature = array_merge(['field' => $field], $options);
+
+        $this->addQueryProtected([
+            'rank_feature' => $rankFeature,
+        ]);
+
+        return $this;
+    }
+
+    /**
      * Add an exists query to find documents with a field value.
      *
      * Matches documents where the specified field has a non-null value.
@@ -792,6 +863,97 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
+     * Enable the Search Profile API for this request.
+     *
+     * Adds a top-level `profile: true` to the search body, causing
+     * Elasticsearch to return detailed timing and execution information
+     * for each query, aggregation, and fetch phase under a `profile` key
+     * in the response. Useful for diagnosing slow queries.
+     *
+     * @param  bool  $profile  Whether to enable profiling (default true)
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $response = Stretch::index('posts')
+     *     ->match('title', 'laravel')
+     *     ->profile()
+     *     ->execute();
+     *
+     * $timings = $response['profile'];
+     * ```
+     */
+    public function profile(bool $profile = true): static
+    {
+        $this->profile = $profile;
+
+        return $this;
+    }
+
+    /**
+     * Collapse hits by a single-valued field.
+     *
+     * Returns at most one hit per unique value of `$field`. Typically used
+     * to de-duplicate results where many documents share the same identity
+     * (e.g. one hit per user, one per parent id). Supports `inner_hits`
+     * for retrieving additional hits per collapsed group and a nested
+     * `collapse` inside `inner_hits` for a second level of collapsing.
+     *
+     * Pass a string to collapse on a field with defaults, or an array for
+     * full control over the collapse object.
+     *
+     * @param  string|array  $field  Field name, or a full collapse config array
+     * @param  array|null  $innerHits  Optional inner_hits config (object or list of objects)
+     * @param  int|null  $maxConcurrentGroupSearches  Concurrency limit for inner_hits group searches
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * // Simple collapse by field
+     * $builder->collapse('user.id');
+     *
+     * // Collapse with inner_hits for the top 5 most recent per user
+     * $builder->collapse('user.id', [
+     *     'name' => 'most_recent',
+     *     'size' => 5,
+     *     'sort' => [['@timestamp' => 'desc']],
+     * ], maxConcurrentGroupSearches: 4);
+     *
+     * // Full control — pass the entire collapse object
+     * $builder->collapse([
+     *     'field' => 'geo.country_name',
+     *     'inner_hits' => [
+     *         'name' => 'by_location',
+     *         'collapse' => ['field' => 'user.id'],
+     *         'size' => 3,
+     *     ],
+     * ]);
+     * ```
+     */
+    public function collapse(string|array $field, ?array $innerHits = null, ?int $maxConcurrentGroupSearches = null): static
+    {
+        if (is_array($field)) {
+            $this->collapse = $field;
+
+            return $this;
+        }
+
+        $collapse = ['field' => $field];
+
+        if ($innerHits !== null) {
+            $collapse['inner_hits'] = $innerHits;
+        }
+
+        if ($maxConcurrentGroupSearches !== null) {
+            $collapse['max_concurrent_group_searches'] = $maxConcurrentGroupSearches;
+        }
+
+        $this->collapse = $collapse;
+
+        return $this;
+    }
+
+    /**
      * Add a named aggregation to the query.
      *
      * Aggregations provide analytics and statistics about search results.
@@ -939,6 +1101,14 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
                 $body['post_filter'] = $this->buildPostFilter();
             }
 
+            if ($this->collapse !== null) {
+                $body['collapse'] = $this->collapse;
+            }
+
+            if ($this->profile !== null) {
+                $body['profile'] = $this->profile;
+            }
+
             return $body;
         }
 
@@ -1004,6 +1174,14 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
             $body['post_filter'] = $this->buildPostFilter();
         }
 
+        if ($this->collapse !== null) {
+            $body['collapse'] = $this->collapse;
+        }
+
+        if ($this->profile !== null) {
+            $body['profile'] = $this->profile;
+        }
+
         return $body;
     }
 
@@ -1050,7 +1228,33 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
             $params['body'] = $body;
         }
 
+        $this->lastQuery = $params;
+
         return $this->client->search($params);
+    }
+
+    /**
+     * Get the parameters sent to Elasticsearch on the most recent execute().
+     *
+     * Returns the exact `['index' => ..., 'body' => ...]` payload that was
+     * last dispatched to the client, or null if execute() has not yet run
+     * on this builder instance. Useful for debugging, logging, and for
+     * replaying or inspecting the final query after caching or retriever
+     * rewriting has been applied.
+     *
+     * @return array|null The last executed query parameters, or null if never executed
+     *
+     * @example
+     * ```php
+     * $builder = Stretch::index('posts')->match('title', 'Laravel');
+     * $builder->execute();
+     * $sent = $builder->getLastQuery();
+     * // $sent === ['index' => 'posts', 'body' => ['query' => [...], 'size' => ..., 'from' => 0]]
+     * ```
+     */
+    public function getLastQuery(): ?array
+    {
+        return $this->lastQuery;
     }
 
     /**

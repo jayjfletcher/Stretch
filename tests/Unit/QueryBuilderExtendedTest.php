@@ -46,6 +46,155 @@ it('can create an exists query', function () {
     expect($query['query']['exists']['field'])->toBe('email');
 });
 
+it('can create a rank_feature query with default linear scoring', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->rankFeature('pagerank');
+
+    $query = $builder->build();
+
+    expect($query['query']['rank_feature']['field'])->toBe('pagerank');
+});
+
+it('can create a rank_feature query with saturation function', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->rankFeature('pagerank', ['saturation' => ['pivot' => 8]]);
+
+    $query = $builder->build();
+
+    expect($query['query']['rank_feature']['field'])->toBe('pagerank');
+    expect($query['query']['rank_feature']['saturation']['pivot'])->toBe(8);
+});
+
+it('can create a rank_feature query with log function and boost', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->rankFeature('url_length', [
+        'log' => ['scaling_factor' => 4],
+        'boost' => 2.0,
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['query']['rank_feature']['field'])->toBe('url_length');
+    expect($query['query']['rank_feature']['log']['scaling_factor'])->toBe(4);
+    expect($query['query']['rank_feature']['boost'])->toBe(2.0);
+});
+
+it('can create a rank_feature query with sigmoid function', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->rankFeature('topics.sports', [
+        'sigmoid' => ['pivot' => 7, 'exponent' => 0.6],
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['query']['rank_feature']['field'])->toBe('topics.sports');
+    expect($query['query']['rank_feature']['sigmoid']['pivot'])->toBe(7);
+    expect($query['query']['rank_feature']['sigmoid']['exponent'])->toBe(0.6);
+});
+
+it('can enable profiling with profile()', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'laravel')->profile();
+
+    $query = $builder->build();
+
+    expect($query['profile'])->toBeTrue();
+});
+
+it('can disable profiling by passing false', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'laravel')->profile(false);
+
+    $query = $builder->build();
+
+    expect($query['profile'])->toBeFalse();
+});
+
+it('omits profile when not called', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'laravel');
+
+    $query = $builder->build();
+
+    expect($query)->not->toHaveKey('profile');
+});
+
+it('can collapse hits by a simple field', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('message', 'GET /search')->collapse('user.id');
+
+    $query = $builder->build();
+
+    expect($query['collapse'])->toBe(['field' => 'user.id']);
+});
+
+it('can collapse with inner_hits and max_concurrent_group_searches', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->collapse('user.id', [
+        'name' => 'most_recent',
+        'size' => 5,
+        'sort' => [['@timestamp' => 'desc']],
+    ], maxConcurrentGroupSearches: 4);
+
+    $query = $builder->build();
+
+    expect($query['collapse']['field'])->toBe('user.id');
+    expect($query['collapse']['inner_hits']['name'])->toBe('most_recent');
+    expect($query['collapse']['inner_hits']['size'])->toBe(5);
+    expect($query['collapse']['max_concurrent_group_searches'])->toBe(4);
+});
+
+it('can collapse with a full config array', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->collapse([
+        'field' => 'geo.country_name',
+        'inner_hits' => [
+            'name' => 'by_location',
+            'collapse' => ['field' => 'user.id'],
+            'size' => 3,
+        ],
+    ]);
+
+    $query = $builder->build();
+
+    expect($query['collapse']['field'])->toBe('geo.country_name');
+    expect($query['collapse']['inner_hits']['collapse']['field'])->toBe('user.id');
+});
+
+it('omits collapse when not called', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->match('title', 'laravel');
+
+    $query = $builder->build();
+
+    expect($query)->not->toHaveKey('collapse');
+});
+
+it('can use rank_feature inside a bool should clause', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->bool(function ($bool) {
+        $bool->must(fn ($q) => $q->match('content', 'laravel'))
+            ->should(fn ($q) => $q->rankFeature('pagerank', ['saturation' => ['pivot' => 8]]));
+    });
+
+    $query = $builder->build();
+
+    expect($query['query']['bool']['should'][0]['rank_feature']['field'])->toBe('pagerank');
+    expect($query['query']['bool']['should'][0]['rank_feature']['saturation']['pivot'])->toBe(8);
+});
+
 it('can create a nested query', function () {
     $builder = new ElasticsearchQueryBuilder;
 

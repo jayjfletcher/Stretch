@@ -87,3 +87,51 @@ it('wraps sort in body', function () {
         ->sort('created_at', 'desc')
         ->execute();
 });
+
+it('returns null from getLastQuery before execute', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    expect($builder->getLastQuery())->toBeNull();
+});
+
+it('captures the last query dispatched to the client', function () {
+    $mockClient = m::mock(ClientContract::class);
+
+    $mockClient->shouldReceive('search')
+        ->once()
+        ->andReturn(['hits' => ['total' => ['value' => 0], 'hits' => []]]);
+
+    $builder = new ElasticsearchQueryBuilder($mockClient);
+
+    $builder->index('test_index')
+        ->match('title', 'laravel')
+        ->size(25)
+        ->execute();
+
+    $last = $builder->getLastQuery();
+
+    expect($last)->toBeArray();
+    expect($last['index'])->toBe('test_index');
+    expect($last['body']['query']['match']['title']['query'])->toBe('laravel');
+    expect($last['body']['size'])->toBe(25);
+});
+
+it('overwrites lastQuery on repeated execute calls', function () {
+    $mockClient = m::mock(ClientContract::class);
+
+    $mockClient->shouldReceive('search')
+        ->twice()
+        ->andReturn(['hits' => ['total' => ['value' => 0], 'hits' => []]]);
+
+    $builder = new ElasticsearchQueryBuilder($mockClient);
+
+    $builder->index('test_index')->match('title', 'first')->execute();
+    $first = $builder->getLastQuery();
+
+    // Mutate and run again — lastQuery should reflect the new payload.
+    $builder->match('body', 'second')->execute();
+    $second = $builder->getLastQuery();
+
+    expect($first['body']['query']['match']['title']['query'])->toBe('first');
+    expect($second['body']['query']['bool']['must'][1]['match']['body']['query'])->toBe('second');
+});

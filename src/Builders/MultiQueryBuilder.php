@@ -34,6 +34,16 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
     protected array $queries = [];
 
     /**
+     * The parameters sent to the client on the most recent execute() call.
+     *
+     * Contains the `body` array exactly as it was passed to `_msearch`.
+     * Null until the first execute() on this builder instance.
+     *
+     * @var array|null
+     */
+    protected ?array $lastQuery = null;
+
+    /**
      * Create a new MultiQueryBuilder instance.
      *
      * @param  ClientContract|null  $client  The Elasticsearch client for query execution
@@ -157,10 +167,15 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
         }
 
         if (empty($this->queries)) {
+            $this->lastQuery = ['body' => []];
+
             return ['responses' => []];
         }
 
-        $results = $this->client->msearch(['body' => $this->build()]);
+        $params = ['body' => $this->build()];
+        $this->lastQuery = $params;
+
+        $results = $this->client->msearch($params);
 
         $key = -1;
         $results['responses'] = collect($this->queries)->sortKeys()->map(function () use (&$results, &$key) {
@@ -191,5 +206,28 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
     public function count(): int
     {
         return count($this->queries);
+    }
+
+    /**
+     * Get the parameters sent to Elasticsearch on the most recent execute().
+     *
+     * Returns the `['body' => ...]` payload last dispatched to `_msearch`,
+     * or null if execute() has not yet run on this builder instance.
+     *
+     * @return array|null The last executed msearch parameters, or null if never executed
+     *
+     * @example
+     * ```php
+     * $multi = Stretch::multi()
+     *     ->add('posts', fn ($q) => $q->index('posts')->match('title', 'Laravel'))
+     *     ->add('users', fn ($q) => $q->index('users')->term('active', true));
+     * $multi->execute();
+     * $sent = $multi->getLastQuery();
+     * // $sent['body'] is the alternating header/body array sent to _msearch
+     * ```
+     */
+    public function getLastQuery(): ?array
+    {
+        return $this->lastQuery;
     }
 }
