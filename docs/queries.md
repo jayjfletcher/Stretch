@@ -1,6 +1,6 @@
 # Queries
 
-Stretch provides a fluent query builder for all major Elasticsearch query types. Queries are built via `Stretch::index()` and executed with `->execute()`.
+Stretch provides a fluent query builder for all major Elasticsearch query types. Queries are built via `Stretch::index()` and executed with `->execute()`. Use `->delete()` instead of `->execute()` to delete matching documents via `_delete_by_query`.
 
 ## Match Query
 

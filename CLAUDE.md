@@ -52,6 +52,7 @@ The query builder uses a builder pattern with internal arrays (`$query`, `$aggre
 - `retriever()` - Modern ES 8.14+ retriever API (standard, kNN, RRF)
 - `filter()` - Filter context (no scoring, cached)
 - `postFilter()` - Applied after aggregations; narrows hits without affecting aggregation buckets (faceted search)
+- `delete()` - Executes a `_delete_by_query` using the built query instead of searching; returns ES delete response
 
 ### kNN with Server-Side Embeddings
 
@@ -97,6 +98,27 @@ Stretch::index('products')
     ->postFilter(fn ($q) => $q->term('color.keyword', 'red'))
     ->execute();
 ```
+
+### Delete By Query
+
+Use `delete()` on the query builder to delete all documents matching the built query. Accepts same query clauses as a search. No query = `match_all`.
+
+```php
+// via builder (chainable)
+Stretch::index('posts')
+    ->term('status', 'draft')
+    ->delete();
+
+// with range
+Stretch::index('logs')
+    ->range('created_at')->lt('2024-01-01')
+    ->delete();
+
+// via Stretch facade (callback style)
+Stretch::deleteByQuery('posts', fn ($q) => $q->term('status', 'draft'));
+```
+
+Response contains `deleted`, `total`, `failures`, etc. (standard ES `_delete_by_query` shape).
 
 ### Track Total Hits
 

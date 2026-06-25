@@ -323,6 +323,26 @@ class Stretch
     }
 
     /**
+     * Delete documents matching a query.
+     *
+     * @param  string  $index  The index to delete from
+     * @param  callable  $callback  Receives an ElasticsearchQueryBuilder to build the query
+     * @return array The delete by query response (deleted, total, failures, etc.)
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteByQuery(string $index, callable $callback): array
+    {
+        $builder = new \JayI\Stretch\Builders\ElasticsearchQueryBuilder;
+        $callback($builder);
+
+        return $this->client->deleteByQuery([
+            'index' => $index,
+            'body' => ['query' => $builder->build()['query'] ?? ['match_all' => (object) []]],
+        ]);
+    }
+
+    /**
      * Retrieve a document by ID.
      *
      * @param  string  $index  The index containing the document

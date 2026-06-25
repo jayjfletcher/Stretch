@@ -133,3 +133,38 @@ it('can perform bulk operations', function () {
 
     expect($result['errors'])->toBeFalse();
 });
+
+it('can delete by query', function () {
+    $mockClient = m::mock(ClientContract::class);
+    $mockClient->shouldReceive('deleteByQuery')
+        ->once()
+        ->with(m::on(function ($params) {
+            return $params['index'] === 'posts'
+                && isset($params['body']['query']['term']['status'])
+                && $params['body']['query']['term']['status'] === 'draft';
+        }))
+        ->andReturn(['deleted' => 5, 'failures' => []]);
+
+    $stretch = new Stretch($mockClient);
+
+    $result = $stretch->deleteByQuery('posts', fn ($q) => $q->term('status', 'draft'));
+
+    expect($result['deleted'])->toBe(5);
+});
+
+it('delete by query uses match_all when no query set', function () {
+    $mockClient = m::mock(ClientContract::class);
+    $mockClient->shouldReceive('deleteByQuery')
+        ->once()
+        ->with(m::on(function ($params) {
+            return $params['index'] === 'posts'
+                && isset($params['body']['query']['match_all']);
+        }))
+        ->andReturn(['deleted' => 100, 'failures' => []]);
+
+    $stretch = new Stretch($mockClient);
+
+    $result = $stretch->deleteByQuery('posts', fn ($q) => $q);
+
+    expect($result['deleted'])->toBe(100);
+});

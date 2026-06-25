@@ -1233,6 +1233,21 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
         return $this->client->search($params);
     }
 
+    public function delete(): array
+    {
+        if (! $this->client) {
+            throw new \RuntimeException('Client not set. Cannot execute query.');
+        }
+
+        $body = $this->build();
+        $query = $body['query'] ?? ['match_all' => (object) []];
+
+        return $this->client->deleteByQuery([
+            'index' => $this->getIndex(),
+            'body' => ['query' => $query],
+        ]);
+    }
+
     /**
      * Get the parameters sent to Elasticsearch on the most recent execute().
      *

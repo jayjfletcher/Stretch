@@ -101,6 +101,15 @@ class ElasticsearchClient implements ClientContract
         }
     }
 
+    public function deleteByQuery(array $params): array
+    {
+        try {
+            return $this->client->deleteByQuery($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Delete by query failed: {$exception->getMessage()}", 0, $exception);
+        }
+    }
+
     /**
      * Execute bulk operations.
      *

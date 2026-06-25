@@ -135,3 +135,42 @@ it('overwrites lastQuery on repeated execute calls', function () {
     expect($first['body']['query']['match']['title']['query'])->toBe('first');
     expect($second['body']['query']['bool']['must'][1]['match']['body']['query'])->toBe('second');
 });
+
+it('delete() calls deleteByQuery with built query', function () {
+    $mockClient = m::mock(ClientContract::class);
+
+    $mockClient->shouldReceive('deleteByQuery')
+        ->once()
+        ->with(m::on(function ($params) {
+            return $params['index'] === 'posts'
+                && isset($params['body']['query']['term']['status'])
+                && $params['body']['query']['term']['status'] === 'draft';
+        }))
+        ->andReturn(['deleted' => 3, 'failures' => []]);
+
+    $result = (new ElasticsearchQueryBuilder($mockClient))
+        ->index('posts')
+        ->term('status', 'draft')
+        ->delete();
+
+    expect($result['deleted'])->toBe(3);
+});
+
+it('delete() uses match_all when no query clauses set', function () {
+    $mockClient = m::mock(ClientContract::class);
+
+    $mockClient->shouldReceive('deleteByQuery')
+        ->once()
+        ->with(m::on(fn ($p) => isset($p['body']['query']['match_all'])))
+        ->andReturn(['deleted' => 50, 'failures' => []]);
+
+    $result = (new ElasticsearchQueryBuilder($mockClient))
+        ->index('logs')
+        ->delete();
+
+    expect($result['deleted'])->toBe(50);
+});
+
+it('delete() throws when client not set', function () {
+    (new ElasticsearchQueryBuilder)->index('posts')->term('status', 'draft')->delete();
+})->throws(\RuntimeException::class);

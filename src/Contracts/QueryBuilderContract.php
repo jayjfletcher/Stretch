@@ -327,6 +327,15 @@ interface QueryBuilderContract
     public function execute(): array;
 
     /**
+     * Delete documents matching the current query.
+     *
+     * @return array The delete by query response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function delete(): array;
+
+    /**
      * Get the raw query array for debugging.
      *
      * @return array The complete Elasticsearch query body

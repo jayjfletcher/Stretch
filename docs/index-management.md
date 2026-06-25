@@ -105,6 +105,49 @@ $result = Stretch::updateDocument('posts', 'post-123', [
 $result = Stretch::deleteDocument('posts', 'post-123');
 ```
 
+### Delete by Query
+
+Delete all documents matching a query. Uses the Elasticsearch `_delete_by_query` API.
+
+**Via the query builder (chainable):**
+
+```php
+// Delete all drafts
+Stretch::index('posts')
+    ->term('status', 'draft')
+    ->delete();
+
+// Delete old logs
+Stretch::index('logs')
+    ->range('created_at')->lt('2024-01-01')
+    ->delete();
+
+// Delete with bool query
+Stretch::index('posts')
+    ->bool(function ($bool) {
+        $bool->filter(fn($q) => $q->term('status', 'draft'));
+        $bool->filter(fn($q) => $q->range('created_at')->lt('2024-01-01'));
+    })
+    ->delete();
+```
+
+**Via the facade (callback style):**
+
+```php
+Stretch::deleteByQuery('posts', fn($q) => $q->term('status', 'draft'));
+```
+
+The response follows the standard Elasticsearch `_delete_by_query` shape:
+
+```php
+[
+    'deleted'  => 42,
+    'total'    => 42,
+    'failures' => [],
+    // ...
+]
+```
+
 ## Bulk Operations
 
 Execute multiple index, update, or delete operations in a single request:

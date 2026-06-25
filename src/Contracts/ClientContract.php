@@ -56,6 +56,16 @@ interface ClientContract
     public function delete(array $params): array;
 
     /**
+     * Delete documents matching a query.
+     *
+     * @param  array  $params  Parameters including index and body with query
+     * @return array The delete by query response as an array
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function deleteByQuery(array $params): array;
+
+    /**
      * Execute bulk operations.
      *
      * @param  array  $params  Bulk parameters with body containing operations
