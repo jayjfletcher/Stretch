@@ -16,7 +16,7 @@ interface MultiQueryBuilderContract
     /**
      * Add a query to the multi-search request
      *
-     * @param  string|array  $index  The index or indices to search
+     * @param  string  $name  The name identifying this query in the multi-search request
      * @param  callable|QueryBuilderContract  $query  A callback or query builder instance
      */
     public function add(string $name, callable|QueryBuilderContract $query): static;
