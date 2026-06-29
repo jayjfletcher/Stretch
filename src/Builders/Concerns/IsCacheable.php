@@ -7,8 +7,6 @@ namespace JayI\Stretch\Builders\Concerns;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
-use JayI\Stretch\Builders\MultiQueryBuilder;
 
 /**
  * Provides caching capabilities for Elasticsearch query builders.
@@ -56,9 +54,9 @@ trait IsCacheable
     /**
      * Enable caching for this query.
      *
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function cache(): self
+    public function cache(): static
     {
         return $this->setCacheEnabled();
     }
@@ -69,9 +67,9 @@ trait IsCacheable
      * This forces a fresh result by invalidating the cached entry
      * before executing the query.
      *
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function clearCache(): self
+    public function clearCache(): static
     {
         return $this->setCacheClear();
     }
@@ -90,9 +88,9 @@ trait IsCacheable
      * Set whether caching is enabled.
      *
      * @param  bool  $cacheEnabled  Whether to enable caching
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function setCacheEnabled(bool $cacheEnabled = true): self
+    public function setCacheEnabled(bool $cacheEnabled = true): static
     {
         $this->cacheEnabled = $cacheEnabled;
 
@@ -113,9 +111,9 @@ trait IsCacheable
      * Set whether to clear the cache before execution.
      *
      * @param  bool  $clear  Whether to clear the cache
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function setCacheClear(bool $clear = true): self
+    public function setCacheClear(bool $clear = true): static
     {
         $this->cacheClear = $clear;
 
@@ -139,14 +137,14 @@ trait IsCacheable
      * The first value is the "fresh" period, the second is the "stale" period.
      *
      * @param  array|int  $ttl  Array of [fresh_seconds, stale_seconds] or int
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      *
      * @example
      * ```php
      * ->setCacheTtl([300, 600]) // Fresh for 5 min, stale for 10 min
      * ```
      */
-    public function setCacheTtl(array|int $ttl): self
+    public function setCacheTtl(array|int $ttl): static
     {
         $this->cacheTtl = $ttl;
 
@@ -169,9 +167,9 @@ trait IsCacheable
      * Set a custom prefix for the cache key.
      *
      * @param  string  $prefix  The prefix to prepend to cache keys
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function setCachePrefix(string $prefix): self
+    public function setCachePrefix(string $prefix): static
     {
         $this->cachePrefix = $prefix;
 
@@ -194,9 +192,9 @@ trait IsCacheable
      * Set a custom cache store.
      *
      * @param  string  $store  The Laravel cache store name
-     * @return MultiQueryBuilder|IsCacheable|ElasticsearchQueryBuilder Returns the builder instance for method chaining
+     * @return static Returns the builder instance for method chaining
      */
-    public function setCacheStore(string $store): self
+    public function setCacheStore(string $store): static
     {
         $this->cacheStore = $store;
 
