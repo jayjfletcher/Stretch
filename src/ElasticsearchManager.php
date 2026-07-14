@@ -111,6 +111,19 @@ class ElasticsearchManager
             $clientBuilder->setSSLVerification(false);
         }
 
+        // Bound the HTTP client so a slow or hung node cannot block the caller
+        // (and any open DB transaction) indefinitely. Only applied when the
+        // connection declares them, so connections without these keys are
+        // unaffected.
+        $httpOptions = array_filter([
+            'connect_timeout' => $config['connect_timeout'] ?? null,
+            'timeout' => $config['timeout'] ?? null,
+        ], static fn ($value): bool => $value !== null);
+
+        if ($httpOptions !== []) {
+            $clientBuilder->setHttpClientOptions($httpOptions);
+        }
+
         if (config('stretch.logging.enabled')) {
             $clientBuilder->setLogger($this->app['log']);
         }
