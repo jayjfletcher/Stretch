@@ -143,3 +143,48 @@ it('works with date string values', function () {
     expect($result['range']['timestamp']['gte'])->toBe('now-1d');
     expect($result['range']['timestamp']['lte'])->toBe('now');
 });
+
+it('does not attach an empty range clause when only timezone or format is set', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->range('created_at')->timezone('UTC')->format('yyyy-MM-dd');
+
+    $query = $builder->build();
+
+    // No bound was ever added, so no range clause should reach the parent.
+    expect($query)->not->toHaveKey('query');
+});
+
+it('attaches timezone and format once a bound exists', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->range('created_at')->timezone('UTC')->gte('2024-01-01');
+
+    $query = $builder->build();
+
+    expect($query['query']['range']['created_at']['gte'])->toBe('2024-01-01')
+        ->and($query['query']['range']['created_at']['time_zone'])->toBe('UTC');
+});
+
+it('keeps interleaved range builders for the same field independent', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $first = $builder->range('price');
+    $second = $builder->range('price');
+
+    $first->gte(100);
+    $second->lte(500);
+    $first->lt(200);
+
+    $query = $builder->build();
+
+    // Two distinct range clauses must survive under bool.must, not clobber.
+    $ranges = collect($query['query']['bool']['must'] ?? [])
+        ->filter(fn ($clause) => isset($clause['range']['price']))
+        ->map(fn ($clause) => $clause['range']['price'])
+        ->values();
+
+    expect($ranges)->toHaveCount(2)
+        ->and($ranges[0])->toBe(['gte' => 100, 'lt' => 200])
+        ->and($ranges[1])->toBe(['lte' => 500]);
+});
