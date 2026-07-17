@@ -7,7 +7,7 @@ use JayI\Stretch\ElasticsearchManager;
 it('returns the default connection name from config', function () {
     config(['stretch.default' => 'default']);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     expect($manager->getDefaultConnection())->toBe('default');
 });
@@ -20,7 +20,7 @@ it('returns all configured connection names', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     expect($manager->getConnections())->toBe(['default', 'analytics']);
 });
@@ -32,7 +32,7 @@ it('throws exception for unconfigured connection', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     expect(fn () => $manager->connection('nonexistent'))
         ->toThrow(InvalidArgumentException::class, 'Elasticsearch connection [nonexistent] not configured.');
@@ -54,7 +54,7 @@ it('can purge a cached connection', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     // Create a connection to cache it
     $firstConnection = $manager->connection('default');
@@ -83,7 +83,7 @@ it('can disconnect all cached connections', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     // Create a connection
     $firstConnection = $manager->connection('default');
@@ -111,7 +111,7 @@ it('caches connections and returns same instance', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     $first = $manager->connection('default');
     $second = $manager->connection('default');
@@ -135,7 +135,7 @@ it('uses default connection when null is passed', function () {
         ],
     ]);
 
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     $defaultConn = $manager->connection();
     $explicitConn = $manager->connection('default');

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace JayI\Stretch\Client;
 
 use Elastic\Elasticsearch\Client;
+use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Exceptions\StretchException;
 
@@ -46,7 +48,7 @@ class ElasticsearchClient implements ClientContract
 
             return $response;
         } catch (Exception $exception) {
-            throw new StretchException("Search failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Search failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -63,7 +65,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->index($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Index operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Index operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -80,7 +82,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->update($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Update operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Update operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -97,7 +99,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->delete($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Delete operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Delete operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -106,7 +108,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->deleteByQuery($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Delete by query failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Delete by query failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -123,7 +125,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->bulk($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Bulk operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Bulk operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -139,7 +141,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->indices()->get(['index' => '*'])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get indices: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get indices: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -156,23 +158,46 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->indices()->getMapping(['index' => $index])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get mapping for {$index}: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get mapping for {$index}: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
     /**
      * Check if an index exists.
      *
+     * Only a 404 response is treated as "the index does not exist"; any
+     * other failure (authentication, connectivity, server errors) is
+     * rethrown as a StretchException instead of being masked as false.
+     *
      * @param  string  $index  The index name to check
-     * @return bool True if the index exists, false otherwise
+     * @return bool True if the index exists, false if Elasticsearch returned 404
+     *
+     * @throws StretchException If the existence check fails for any other reason
      */
     public function indexExists(string $index): bool
     {
         try {
-            return $this->client->indices()->exists(['index' => $index])->asBool();
+            return $this->performIndexExists($index);
+        } catch (ClientResponseException $exception) {
+            if ($exception->getCode() === 404) {
+                return false;
+            }
+
+            throw new StretchException("Failed to check index '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         } catch (Exception $exception) {
-            return false;
+            throw new StretchException("Failed to check index '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
+    }
+
+    /**
+     * Perform the raw index-existence request against Elasticsearch.
+     *
+     * @param  string  $index  The index name to check
+     * @return bool True if the response indicates the index exists
+     */
+    protected function performIndexExists(string $index): bool
+    {
+        return $this->client->indices()->exists(['index' => $index])->asBool();
     }
 
     /**
@@ -194,7 +219,7 @@ class ElasticsearchClient implements ClientContract
 
             return $this->client->indices()->create($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to create index '{$index}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to create index '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -211,7 +236,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->indices()->delete(['index' => $index])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to delete index '{$index}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to delete index '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -227,7 +252,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->cluster()->health()->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get cluster health: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get cluster health: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -244,7 +269,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->get($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Get operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Get operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -267,7 +292,7 @@ class ElasticsearchClient implements ClientContract
 
             return $response;
         } catch (Exception $exception) {
-            throw new StretchException("Multi-search operation failed: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Multi-search operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -291,7 +316,7 @@ class ElasticsearchClient implements ClientContract
 
             return $this->client->synonyms()->putSynonym($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to put synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to put synonym set '{$id}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -311,7 +336,7 @@ class ElasticsearchClient implements ClientContract
 
             return $this->client->synonyms()->getSynonym($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get synonym set '{$id}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -328,7 +353,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->synonyms()->deleteSynonym(['id' => $id])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to delete synonym set '{$id}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to delete synonym set '{$id}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -345,7 +370,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->synonyms()->getSynonymsSets($options)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get synonym sets: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get synonym sets: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -371,7 +396,7 @@ class ElasticsearchClient implements ClientContract
 
             return $this->client->synonyms()->putSynonymRule($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to put synonym rule '{$ruleId}' in set '{$setId}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to put synonym rule '{$ruleId}' in set '{$setId}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -392,7 +417,7 @@ class ElasticsearchClient implements ClientContract
                 'rule_id' => $ruleId,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -416,7 +441,7 @@ class ElasticsearchClient implements ClientContract
 
             return $this->client->synonyms()->deleteSynonymRule($params)->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to delete synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to delete synonym rule '{$ruleId}' from set '{$setId}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -439,7 +464,7 @@ class ElasticsearchClient implements ClientContract
                 'body' => $body,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to put pipeline '$id': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to put pipeline '$id': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -456,7 +481,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->ingest()->getPipeline(['id' => $id])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get pipeline '$id': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get pipeline '$id': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -473,7 +498,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->ingest()->deletePipeline(['id' => $id])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to delete pipeline '$id': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to delete pipeline '$id': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -485,7 +510,7 @@ class ElasticsearchClient implements ClientContract
                 'fields' => implode(',', $fields),
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to fetch field caps for '$index': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to fetch field caps for '$index': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -510,7 +535,7 @@ class ElasticsearchClient implements ClientContract
                 'body' => $body,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to put inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to put inference endpoint '$inferenceId': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -529,7 +554,7 @@ class ElasticsearchClient implements ClientContract
                 'inference_id' => $inferenceId,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get inference endpoint '$inferenceId': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -548,7 +573,7 @@ class ElasticsearchClient implements ClientContract
                 'inference_id' => $inferenceId,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to delete inference endpoint '$inferenceId': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to delete inference endpoint '$inferenceId': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -569,7 +594,7 @@ class ElasticsearchClient implements ClientContract
                 'model_id' => $modelId,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get trained model stats for '$modelId': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -592,7 +617,7 @@ class ElasticsearchClient implements ClientContract
                 'body' => $mapping,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to put mapping for '{$index}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to put mapping for '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -619,7 +644,7 @@ class ElasticsearchClient implements ClientContract
                 'body' => $body,
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to reindex '{$source}' → '{$dest}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to reindex '{$source}' → '{$dest}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -638,7 +663,7 @@ class ElasticsearchClient implements ClientContract
                 'body' => ['actions' => $actions],
             ])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to update aliases: {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to update aliases: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -655,7 +680,7 @@ class ElasticsearchClient implements ClientContract
         try {
             return $this->client->tasks()->get(['task_id' => $id])->asArray();
         } catch (Exception $exception) {
-            throw new StretchException("Failed to get task '{$id}': {$exception->getMessage()}", 0, $exception);
+            throw new StretchException("Failed to get task '{$id}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
         }
     }
 
@@ -693,6 +718,9 @@ class ElasticsearchClient implements ClientContract
     /**
      * Log a message if logging is enabled.
      *
+     * Writes to the channel configured under `stretch.logging.channel`,
+     * falling back to the application's default channel when unset.
+     *
      * @param  string  $message  The log message
      * @param  array  $context  Additional context data
      * @param  string  $level  The log level (info, warning, error, etc.)
@@ -700,7 +728,7 @@ class ElasticsearchClient implements ClientContract
     protected function log(string $message, array $context = [], string $level = 'info'): void
     {
         if (config('stretch.logging.enabled')) {
-            logger()->{$level}($message, $context);
+            Log::channel(config('stretch.logging.channel'))->{$level}($message, $context);
         }
     }
 }

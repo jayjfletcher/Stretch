@@ -47,7 +47,9 @@ class RetrieverBuilder
         $queryBuilder = new ElasticsearchQueryBuilder;
         $callback($queryBuilder);
 
-        $standard = array_merge(['query' => $queryBuilder->build()['query']], $options);
+        $query = $queryBuilder->build()['query'] ?? null;
+
+        $standard = array_merge($query !== null ? ['query' => $query] : [], $options);
         $retriever = ['standard' => $standard];
 
         $this->retriever = $retriever;

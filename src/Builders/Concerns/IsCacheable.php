@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JayI\Stretch\Builders\Concerns;
 
+use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -13,7 +14,9 @@ use Illuminate\Support\Facades\Cache;
  *
  * This trait enables query result caching using Laravel's cache system with
  * flexible TTL support (stale-while-revalidate pattern). Cache keys are
- * automatically generated based on the query structure and index names.
+ * automatically generated from the connection name, index names, and query
+ * structure. Caching defaults to the `stretch.cache.enabled` config value
+ * and can be toggled per query via `cache()` / `setCacheEnabled()`.
  *
  * @example
  * ```php
@@ -27,9 +30,10 @@ use Illuminate\Support\Facades\Cache;
 trait IsCacheable
 {
     /**
-     * Whether caching is enabled for this query.
+     * Whether caching is enabled for this query, or null to fall back to
+     * the `stretch.cache.enabled` config default.
      */
-    protected bool $cacheEnabled = false;
+    protected ?bool $cacheEnabled = null;
 
     /**
      * Whether to clear the cache before executing the query.
@@ -100,11 +104,14 @@ trait IsCacheable
     /**
      * Get whether caching is enabled.
      *
+     * Returns the per-query setting if one was made, otherwise falls back
+     * to the `stretch.cache.enabled` config default.
+     *
      * @return bool True if caching is enabled
      */
     public function getCacheEnabled(): bool
     {
-        return $this->cacheEnabled;
+        return $this->cacheEnabled ?? (bool) config('stretch.cache.enabled', false);
     }
 
     /**
@@ -154,13 +161,39 @@ trait IsCacheable
     /**
      * Get the cache TTL configuration.
      *
-     * Returns the custom TTL if set, otherwise falls back to config value.
+     * Returns the custom TTL if set, otherwise falls back to the config
+     * value. Config values may be an int, a [fresh, stale] pair, or a
+     * comma-separated string such as "300,600" (as supplied through the
+     * STRETCH_CACHE_TTL environment variable).
      *
-     * @return array|int The TTL array [fresh_seconds, stale_seconds]
+     * @return array|int The TTL array [fresh_seconds, stale_seconds] or int seconds
      */
     public function getCacheTtl(): array|int
     {
-        return $this->cacheTtl ?? config('stretch.cache.ttl', [300, 600]);
+        return $this->cacheTtl ?? $this->parseCacheTtl(config('stretch.cache.ttl', [300, 600]));
+    }
+
+    /**
+     * Normalize a configured TTL value.
+     *
+     * Comma-separated strings ("300,600") are parsed into an int pair for
+     * flexible caching; single values ("300") become a scalar TTL.
+     *
+     * @param  array|int|string  $ttl  The raw configured TTL value
+     * @return array|int The normalized TTL
+     */
+    protected function parseCacheTtl(array|int|string $ttl): array|int
+    {
+        if (! is_string($ttl)) {
+            return $ttl;
+        }
+
+        $parts = array_map(
+            static fn (string $part): int => (int) trim($part),
+            explode(',', $ttl)
+        );
+
+        return count($parts) === 1 ? $parts[0] : [$parts[0], $parts[1]];
     }
 
     /**
@@ -216,8 +249,9 @@ trait IsCacheable
     /**
      * Get the indexes involved in this query.
      *
-     * Collects index names from either the single index property (for regular queries)
-     * or from multiple queries (for multi-search requests).
+     * Collects index names from either the single index property (for regular
+     * queries) or from multiple queries (for multi-search requests). Array
+     * indices are normalized to comma-separated strings.
      *
      * @return Collection<int, string> Collection of unique index names
      */
@@ -232,64 +266,63 @@ trait IsCacheable
 
         /** @phpstan-ignore function.alreadyNarrowedType */
         if (property_exists($this, 'queries')) {
-            $indexes = collect($this->queries)->pluck('index')->unique();
+            $indexes = collect($this->queries)->pluck('index');
         }
 
-        return $indexes;
+        return $indexes
+            ->filter(fn ($index) => $index !== null)
+            ->map(fn ($index): string => implode(',', (array) $index))
+            ->unique()
+            ->values();
     }
 
     /**
      * Generate a unique cache key for the current query.
      *
-     * The cache key is composed of the prefix, index names, and a SHA1 hash
-     * of the serialized query structure. This ensures different queries
-     * produce different cache keys.
+     * The cache key is composed of the prefix, connection name, index names,
+     * and a SHA1 hash of the serialized query structure. This ensures
+     * different queries — and identical queries executed against different
+     * connections — produce different cache keys.
      *
-     * @param  bool  $clear  Whether to clear the existing cache entry
      * @return string The generated cache key
      */
-    public function getCacheKey(bool $clear = false): string
+    public function getCacheKey(): string
     {
         $sorted = Arr::sortRecursive($this->build());
         $hash = sha1(serialize($sorted));
         $indexes = $this->getIndexes()->implode(':');
 
-        $key = $this->getCachePrefix().$indexes.$hash;
-
-        if ($clear) {
-            Cache::store($this->getCacheStore())->forget($key);
-        }
-
-        return $key;
+        return $this->getCachePrefix().$this->getConnectionName().':'.$indexes.$hash;
     }
 
     /**
-     * Magic method to intercept method calls for caching support.
+     * Run the given execution callback through the cache layer.
      *
-     * When caching is enabled and the 'execute' method is called, this method
-     * wraps the execution with Laravel's flexible cache to provide
-     * stale-while-revalidate caching behavior.
+     * When caching is disabled the callback runs directly. When enabled, the
+     * result is cached using Laravel's flexible() for [fresh, stale] TTL
+     * pairs or remember() for scalar TTLs. A pending clearCache() request is
+     * honoured by forgetting the entry before executing.
      *
-     * @param  string  $name  The method name being called
-     * @param  array  $arguments  The method arguments
-     * @return mixed The method result, potentially cached
+     * @param  Closure(): array  $callback  The callback performing the actual request
+     * @return array The (possibly cached) response
      */
-    public function __call(string $name, array $arguments)
+    protected function executeWithCache(Closure $callback): array
     {
-        $callback = fn () => call_user_func_array([$this, $name], $arguments);
+        if (! $this->isCacheEnabled()) {
+            return $callback();
+        }
+
+        $store = Cache::store($this->getCacheStore());
+        $key = $this->getCacheKey();
+
+        if ($this->getCacheClear()) {
+            $store->forget($key);
+        }
+
         $ttl = $this->getCacheTtl();
-        $method = is_array($ttl) ? 'flexible' : 'remember';
 
-        $arguments = [
-            'key' => $this->getCacheKey($this->getCacheClear()),
-            'ttl' => $ttl,
-            'callback' => $callback,
-        ];
-
-        return when(
-            condition: $this->isCacheEnabled() && ($name == 'execute'),
-            value: fn () => Cache::store($this->getCacheStore())->{$method}(...$arguments),
-            default: $callback,
-        );
+        return is_array($ttl)
+            ? $store->flexible($key, $ttl, $callback)
+            : $store->remember($key, $ttl, $callback);
     }
 }

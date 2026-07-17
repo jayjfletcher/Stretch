@@ -79,6 +79,7 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
      * Add must clauses to the bool query.
      *
      * Documents must match these clauses. Contributes to scoring.
+     * Callbacks that add no query clauses are skipped.
      *
      * @param  callable|array<callable>  $callback  Single callback or array of callbacks
      * @return static Returns the builder instance for method chaining
@@ -86,9 +87,11 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     public function must(callable|array $callback): static
     {
         if (is_callable($callback)) {
-            $queryBuilder = new ElasticsearchQueryBuilder;
-            $callback($queryBuilder);
-            $this->must[] = $queryBuilder->build()['query'];
+            $query = $this->buildSubQuery($callback);
+
+            if ($query !== null) {
+                $this->must[] = $query;
+            }
         } elseif (is_array($callback)) {
             foreach ($callback as $cb) {
                 $this->must($cb);
@@ -103,6 +106,7 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
      *
      * Documents should match these clauses. Contributes to scoring.
      * Use minimumShouldMatch to require a certain number of matches.
+     * Callbacks that add no query clauses are skipped.
      *
      * @param  callable|array<callable>  $callback  Single callback or array of callbacks
      * @return static Returns the builder instance for method chaining
@@ -110,9 +114,11 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     public function should(callable|array $callback): static
     {
         if (is_callable($callback)) {
-            $queryBuilder = new ElasticsearchQueryBuilder;
-            $callback($queryBuilder);
-            $this->should[] = $queryBuilder->build()['query'];
+            $query = $this->buildSubQuery($callback);
+
+            if ($query !== null) {
+                $this->should[] = $query;
+            }
         } elseif (is_array($callback)) {
             foreach ($callback as $cb) {
                 $this->should($cb);
@@ -127,6 +133,7 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
      *
      * Documents must match these clauses but they don't contribute to scoring.
      * Filter clauses are cached by Elasticsearch for better performance.
+     * Callbacks that add no query clauses are skipped.
      *
      * @param  callable|array<callable>  $callback  Single callback or array of callbacks
      * @return static Returns the builder instance for method chaining
@@ -134,9 +141,11 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     public function filter(callable|array $callback): static
     {
         if (is_callable($callback)) {
-            $queryBuilder = new ElasticsearchQueryBuilder;
-            $callback($queryBuilder);
-            $this->filter[] = $queryBuilder->build()['query'];
+            $query = $this->buildSubQuery($callback);
+
+            if ($query !== null) {
+                $this->filter[] = $query;
+            }
         } elseif (is_array($callback)) {
             foreach ($callback as $cb) {
                 $this->filter($cb);
@@ -150,6 +159,7 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
      * Add must_not clauses to the bool query.
      *
      * Documents must not match these clauses.
+     * Callbacks that add no query clauses are skipped.
      *
      * @param  callable|array<callable>  $callback  Single callback or array of callbacks
      * @return static Returns the builder instance for method chaining
@@ -157,9 +167,11 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
     public function mustNot(callable|array $callback): static
     {
         if (is_callable($callback)) {
-            $queryBuilder = new ElasticsearchQueryBuilder;
-            $callback($queryBuilder);
-            $this->mustNot[] = $queryBuilder->build()['query'];
+            $query = $this->buildSubQuery($callback);
+
+            if ($query !== null) {
+                $this->mustNot[] = $query;
+            }
         } elseif (is_array($callback)) {
             foreach ($callback as $cb) {
                 $this->mustNot($cb);
@@ -167,6 +179,23 @@ class BoolQueryBuilder implements BoolQueryBuilderContract
         }
 
         return $this;
+    }
+
+    /**
+     * Build a sub-query from a callback.
+     *
+     * Returns null when the callback added no query clauses, allowing the
+     * caller to skip the clause instead of emitting invalid DSL.
+     *
+     * @param  callable  $callback  Callback receiving a fresh query builder
+     * @return array|null The built query clause, or null when empty
+     */
+    protected function buildSubQuery(callable $callback): ?array
+    {
+        $queryBuilder = new ElasticsearchQueryBuilder;
+        $callback($queryBuilder);
+
+        return $queryBuilder->build()['query'] ?? null;
     }
 
     /**

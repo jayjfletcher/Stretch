@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace JayI\Stretch\Pagination;
 
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,15 +39,25 @@ class ElasticPaginator extends LengthAwarePaginator
         return $this->path;
     }
 
+    /**
+     * Build a paginator from an Elasticsearch search response.
+     *
+     * Handles both total-hit shapes: the default object form
+     * (`hits.total.value`) and the integer form produced by
+     * `rest_total_hits_as_int`. The current page is derived from the
+     * builder's from/size and rounded down for non-aligned offsets.
+     */
     public static function fromResponse(QueryBuilderContract $request, array $response, array $options = []): ElasticPaginator
     {
+        $total = data_get($response, 'hits.total', 0);
+        $size = $request->getSize();
+
         return new ElasticPaginator(
             items: data_get($response, 'hits.hits', []),
-            total: data_get($response, 'hits.total.value', 0),
-            perPage: $request->getSize() ?: config('stretch.query.default_size'),
-            currentPage: $request->getSize() ? (($request->getFrom() / $request->getSize()) + 1) : 1,
+            total: is_array($total) ? ($total['value'] ?? 0) : (int) $total,
+            perPage: $size ?: config('stretch.query.default_size'),
+            currentPage: $size ? (int) floor($request->getFrom() / $size) + 1 : 1,
             options: $options,
         );
-
     }
 }

@@ -2,43 +2,46 @@
 
 declare(strict_types=1);
 
+use Elastic\Elasticsearch\ClientBuilder;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\ElasticsearchManager;
 use JayI\Stretch\Stretch;
 
 it('can use different connections via Stretch facade', function () {
-    // Test that the connection method exists and returns a different instance
     $defaultClientContract = Mockery::mock(ClientContract::class);
     $manager = Mockery::mock(ElasticsearchManager::class);
+    $manager->shouldReceive('connection')->with('alternative')
+        ->andReturn(ClientBuilder::create()->setHosts(['localhost:9200'])->build());
 
-    // Create Stretch instance with manager
     $stretch = new Stretch($defaultClientContract, $manager);
 
-    // Test that connection method exists
-    expect(method_exists($stretch, 'connection'))->toBeTrue();
+    $connected = $stretch->connection('alternative');
+    expect($connected)->toBeInstanceOf(Stretch::class)
+        ->and($connected)->not->toBe($stretch);
 
-    // Test that calling connection without manager setup throws exception
+    // Calling connection without manager setup throws exception
     $stretchWithoutManager = new Stretch($defaultClientContract);
     expect(fn () => $stretchWithoutManager->connection('alternative'))
         ->toThrow(RuntimeException::class, 'Elasticsearch manager not available. Cannot switch connections.');
 });
 
 it('can use different connections in query builder', function () {
-    // Test that the connection method exists in query builder
     $defaultClientContract = Mockery::mock(ClientContract::class);
     $manager = Mockery::mock(ElasticsearchManager::class);
+    $manager->shouldReceive('connection')->with('alternative')
+        ->andReturn(ClientBuilder::create()->setHosts(['localhost:9200'])->build());
 
-    // Create query builder with manager
     $queryBuilder = new ElasticsearchQueryBuilder(
         $defaultClientContract,
         $manager
     );
 
-    // Test that connection method exists
-    expect(method_exists($queryBuilder, 'connection'))->toBeTrue();
+    $connected = $queryBuilder->connection('alternative');
+    expect($connected)->toBeInstanceOf(ElasticsearchQueryBuilder::class)
+        ->and($connected)->not->toBe($queryBuilder);
 
-    // Test that calling connection without manager throws exception
+    // Calling connection without manager throws exception
     $queryBuilderWithoutManager = new ElasticsearchQueryBuilder($defaultClientContract);
     expect(fn () => $queryBuilderWithoutManager->connection('alternative'))
         ->toThrow(RuntimeException::class, 'Elasticsearch manager not available. Cannot switch connections.');
@@ -53,7 +56,7 @@ it('throws exception when trying to switch connections without manager', functio
 });
 
 it('validates connection configuration', function () {
-    $manager = new ElasticsearchManager($this->app);
+    $manager = new ElasticsearchManager(app());
 
     expect(fn () => $manager->connection('nonexistent'))
         ->toThrow(InvalidArgumentException::class, 'Elasticsearch connection [nonexistent] not configured.');

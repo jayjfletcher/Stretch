@@ -6,7 +6,8 @@ namespace JayI\Stretch\Builders;
 
 use Illuminate\Support\Arr;
 use JayI\Stretch\Builders\Concerns\IsCacheable;
-use JayI\Stretch\Client\ElasticsearchClient;
+use JayI\Stretch\Builders\Concerns\SwitchesConnections;
+use JayI\Stretch\Builders\Concerns\TracksLastQuery;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\MultiQueryBuilderContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
@@ -24,22 +25,16 @@ use JayI\Stretch\Exceptions\StretchException;
 class MultiQueryBuilder implements MultiQueryBuilderContract
 {
     use IsCacheable;
+    use SwitchesConnections;
+    use TracksLastQuery;
 
     /**
      * The queries to be executed in the multi-search request.
      * Each entry contains 'index' and 'query' keys.
      *
-     * @var array<int, array{index: string|array, query: QueryBuilderContract}>
+     * @var array<string, array{index: string|array, query: QueryBuilderContract}>
      */
     protected array $queries = [];
-
-    /**
-     * The parameters sent to the client on the most recent execute() call.
-     *
-     * Contains the `body` array exactly as it was passed to `_msearch`.
-     * Null until the first execute() on this builder instance.
-     */
-    protected ?array $lastQuery = null;
 
     /**
      * Create a new MultiQueryBuilder instance.
@@ -53,38 +48,22 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
     ) {}
 
     /**
-     * Switch to a specific Elasticsearch connection.
-     *
-     * @param  string  $name  The connection name as defined in configuration
-     * @return static A new multi-query builder instance using the specified connection
-     *
-     * @throws \RuntimeException If the manager is not available
-     */
-    public function connection(string $name): static
-    {
-        if (! $this->manager) {
-            throw new \RuntimeException('Elasticsearch manager not available. Cannot switch connections.');
-        }
-
-        $client = new ElasticsearchClient($this->manager->connection($name));
-
-        return new static($client, $this->manager);
-    }
-
-    /**
      * Add a query to the multi-search request.
      *
      * Each query can target different indices and have its own search criteria.
-     * Queries are executed in parallel by Elasticsearch.
+     * Queries are executed in parallel by Elasticsearch. When the query does
+     * not set an index explicitly, the result name is used as the index.
      *
+     * @param  string  $name  The name identifying this query in the responses (also the index fallback)
      * @param  callable|QueryBuilderContract  $query  A callback or query builder instance
      * @return static Returns the builder instance for method chaining
      *
      * @example
      * ```php
+     * // The result name doubles as the index when none is set explicitly
      * $builder->add('posts', fn($q) => $q->match('title', 'Laravel'))
      *         ->add('comments', fn($q) => $q->match('content', 'great'))
-     *         ->add(['users', 'profiles'], fn($q) => $q->term('active', true));
+     *         ->add('people', fn($q) => $q->index(['users', 'profiles'])->term('active', true));
      * ```
      */
     public function add(string $name, callable|QueryBuilderContract $query): static
@@ -96,7 +75,7 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
         }
 
         $this->queries[$name] = [
-            'index' => $query->getIndex(),
+            'index' => $query->getIndex() ?? $name,
             'query' => $query,
         ];
 
@@ -140,7 +119,8 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
      * Execute the multi-search request.
      *
      * Sends all queries to Elasticsearch in a single request and returns
-     * all results. If caching is enabled, results may be cached.
+     * all results. When caching is enabled (via the IsCacheable trait), the
+     * response is served from and stored in the configured cache store.
      *
      * @return array The msearch response with 'responses' array containing each query's result
      *
@@ -173,17 +153,18 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
         $params = ['body' => $this->build()];
         $this->lastQuery = $params;
 
-        $results = $this->client->msearch($params);
+        return $this->executeWithCache(function () use ($params): array {
+            $results = $this->client->msearch($params);
 
-        $key = -1;
-        $results['responses'] = collect($this->queries)->sortKeys()->map(function () use (&$results, &$key) {
-            $key++;
+            $key = -1;
+            $results['responses'] = collect($this->queries)->sortKeys()->map(function () use (&$results, &$key) {
+                $key++;
 
-            return Arr::get($results, "responses.{$key}");
-        })->toArray();
+                return Arr::get($results, "responses.{$key}");
+            })->toArray();
 
-        return $results;
-
+            return $results;
+        });
     }
 
     /**
@@ -204,28 +185,5 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
     public function count(): int
     {
         return count($this->queries);
-    }
-
-    /**
-     * Get the parameters sent to Elasticsearch on the most recent execute().
-     *
-     * Returns the `['body' => ...]` payload last dispatched to `_msearch`,
-     * or null if execute() has not yet run on this builder instance.
-     *
-     * @return array|null The last executed msearch parameters, or null if never executed
-     *
-     * @example
-     * ```php
-     * $multi = Stretch::multi()
-     *     ->add('posts', fn ($q) => $q->index('posts')->match('title', 'Laravel'))
-     *     ->add('users', fn ($q) => $q->index('users')->term('active', true));
-     * $multi->execute();
-     * $sent = $multi->getLastQuery();
-     * // $sent['body'] is the alternating header/body array sent to _msearch
-     * ```
-     */
-    public function getLastQuery(): ?array
-    {
-        return $this->lastQuery;
     }
 }

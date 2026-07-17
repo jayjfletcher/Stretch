@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JayI\Stretch\Builders;
 
 use JayI\Stretch\Contracts\AggregationBuilderContract;
+use LogicException;
 
 /**
  * Builds Elasticsearch aggregations for analytics and statistics.
@@ -251,7 +252,8 @@ class AggregationBuilder implements AggregationBuilderContract
     /**
      * Set the maximum number of buckets to return.
      *
-     * Only applies to bucket aggregations like terms.
+     * Only supported on terms aggregations; build() throws a LogicException
+     * when a size is set on an aggregation type that does not support it.
      *
      * @param  int  $size  Maximum number of buckets
      * @return static Returns the builder instance for method chaining
@@ -283,6 +285,10 @@ class AggregationBuilder implements AggregationBuilderContract
 
     /**
      * Set the ordering for bucket aggregations.
+     *
+     * Supported on terms, histogram, and date_histogram aggregations;
+     * build() throws a LogicException when an order is set on an
+     * aggregation type that does not support it.
      *
      * @param  string  $field  Field to order by (_count, _key, or sub-aggregation name)
      * @param  string  $direction  Sort direction (asc or desc)
@@ -349,19 +355,33 @@ class AggregationBuilder implements AggregationBuilderContract
      * Assembles the aggregation with size, ordering, and sub-aggregations.
      *
      * @return array The Elasticsearch aggregation structure
+     *
+     * @throws LogicException When size() or orderBy() was called on an aggregation type that does not support it
      */
     public function build(): array
     {
         $agg = $this->aggregation;
 
-        // Add size if specified and this is a bucket aggregation
+        // Terms aggregations always receive a size (defaulted from config)
         if (isset($agg['terms'])) {
             $agg['terms']['size'] = min(($this->size ?? config('stretch.aggregations.default_size')), config('stretch.aggregations.max_buckets'));
+        } elseif ($this->size !== null) {
+            throw new LogicException(
+                sprintf('size() is only supported on terms aggregations, [%s] given.', $this->aggregationType())
+            );
         }
 
-        // Add order if specified and this is a bucket aggregation
-        if (! empty($this->order) && isset($agg['terms'])) {
-            $agg['terms']['order'] = $this->order;
+        if (! empty($this->order)) {
+            $orderable = collect(['terms', 'histogram', 'date_histogram'])
+                ->first(fn (string $type): bool => isset($agg[$type]));
+
+            if ($orderable === null) {
+                throw new LogicException(
+                    sprintf('orderBy() is only supported on terms, histogram, and date_histogram aggregations, [%s] given.', $this->aggregationType())
+                );
+            }
+
+            $agg[$orderable]['order'] = $this->order;
         }
 
         // Add sub-aggregations
@@ -370,5 +390,13 @@ class AggregationBuilder implements AggregationBuilderContract
         }
 
         return $agg;
+    }
+
+    /**
+     * Get the type key of the configured aggregation for error messages.
+     */
+    protected function aggregationType(): string
+    {
+        return (string) (array_key_first($this->aggregation) ?? 'none');
     }
 }

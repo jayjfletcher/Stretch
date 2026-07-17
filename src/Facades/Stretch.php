@@ -30,6 +30,7 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array indexDocument(string $index, array $document, ?string $id = null) Index a document
  * @method static array updateDocument(string $index, string $id, array $document) Update a document
  * @method static array deleteDocument(string $index, string $id) Delete a document
+ * @method static array deleteByQuery(string $index, callable $callback) Delete documents matching a query
  * @method static array getDocument(string $index, string $id) Get a document by ID
  * @method static array putSynonym(string $id, array $synonymsSet, array $options = []) Create or update a synonym set
  * @method static array getSynonym(string $id, array $options = []) Get a synonym set by id
@@ -45,6 +46,11 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array getInferenceEndpoint(string $inferenceId) Get an inference endpoint by ID
  * @method static array deleteInferenceEndpoint(string $inferenceId) Delete an inference endpoint
  * @method static array getTrainedModelStats(string $modelId) Get stats for a trained ML model
+ * @method static array putMapping(string $index, array $mapping) Update the mapping of an existing index
+ * @method static array reindex(string $source, string $dest, array $options = []) Copy documents between indices via _reindex
+ * @method static array updateAliases(array $actions) Atomically apply a batch of alias actions
+ * @method static array getTask(string $id) Get the status of an async task
+ * @method static array fieldCaps(string $index, array $fields) Run a _field_caps request
  *
  * @see \JayI\Stretch\Stretch
  */

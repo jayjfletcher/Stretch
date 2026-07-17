@@ -1,11 +1,13 @@
-includes:
-    - phpstan-baseline.neon
-
-# Extensions (larastan, phpstan-phpunit, deprecation-rules) are loaded
-# automatically via phpstan/extension-installer.
+# Extensions (larastan, phpstan-phpunit, phpstan-mockery, deprecation-rules)
+# are loaded automatically via phpstan/extension-installer.
 parameters:
     level: 5
     paths:
         - src
-        - config
         - tests
+    ignoreErrors:
+        # Intentional call to an undefined method, verifying the builder's
+        # __call handler throws BadMethodCallException.
+        -
+            message: '#Call to an undefined method .*::definitelyNotAMethod\(\)#'
+            path: tests/Unit/CacheableTest.php

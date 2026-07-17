@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace JayI\Stretch;
 
+use JayI\Stretch\Builders\Concerns\SwitchesConnections;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
 use JayI\Stretch\Builders\MultiQueryBuilder;
-use JayI\Stretch\Client\ElasticsearchClient;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\MultiQueryBuilderContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
@@ -22,6 +22,8 @@ use JayI\Stretch\Exceptions\StretchException;
  */
 class Stretch
 {
+    use SwitchesConnections;
+
     /**
      * Create a new Stretch instance.
      *
@@ -43,34 +45,6 @@ class Stretch
     public function query(): QueryBuilderContract
     {
         return new ElasticsearchQueryBuilder($this->client, $this->manager);
-    }
-
-    /**
-     * Switch to a specific Elasticsearch connection.
-     *
-     * Creates a new Stretch instance using the specified connection name.
-     * This allows you to use different Elasticsearch clusters or configurations
-     * within the same application.
-     *
-     * @param  string  $name  The connection name as defined in configuration
-     * @return static A new Stretch instance using the specified connection
-     *
-     * @throws \RuntimeException If the manager is not available
-     *
-     * @example
-     * ```php
-     * Stretch::connection('analytics')->query()->match('event', 'click')->execute();
-     * ```
-     */
-    public function connection(string $name): static
-    {
-        if (! $this->manager) {
-            throw new \RuntimeException('Elasticsearch manager not available. Cannot switch connections.');
-        }
-
-        $client = new ElasticsearchClient($this->manager->connection($name));
-
-        return new static($client, $this->manager);
     }
 
     /**
@@ -98,10 +72,14 @@ class Stretch
     /**
      * Create a new multi-query builder for executing multiple searches in a single request.
      *
+     * When a sub-query does not set an index explicitly, its result name is
+     * used as the index (see MultiQueryBuilder::add()).
+     *
      * @return MultiQueryBuilderContract A new multi-query builder instance
      *
      * @example
      * ```php
+     * // The result names ('posts', 'users') double as the index names here
      * $results = Stretch::multi()
      *     ->add('posts', fn ($q) => $q->match('title', 'Laravel'))
      *     ->add('users', fn ($q) => $q->term('status', 'active'))

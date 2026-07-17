@@ -8,6 +8,7 @@ use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Exception\ConfigException;
 use Illuminate\Contracts\Foundation\Application;
+use JayI\Stretch\Contracts\ClientContract;
 
 /**
  * ElasticsearchManager manages multiple Elasticsearch connections.
@@ -106,8 +107,8 @@ class ElasticsearchManager
             $clientBuilder->setElasticCloudId($config['cloud_id']);
         }
 
-        // SSL configuration
-        if (! $config['ssl_verification']) {
+        // SSL configuration — verification stays enabled unless explicitly disabled
+        if (! ($config['ssl_verification'] ?? true)) {
             $clientBuilder->setSSLVerification(false);
         }
 
@@ -137,7 +138,7 @@ class ElasticsearchManager
      * @param  string  $name  The connection name
      * @return array The connection configuration array
      *
-     * @throws \InvalidArgumentException If the connection is not configured
+     * @throws \InvalidArgumentException If the connection is not configured or has no hosts
      */
     protected function getConnectionConfig(string $name): array
     {
@@ -147,28 +148,59 @@ class ElasticsearchManager
             throw new \InvalidArgumentException("Elasticsearch connection [{$name}] not configured.");
         }
 
+        if (empty($connections[$name]['hosts'])) {
+            throw new \InvalidArgumentException("Elasticsearch connection [{$name}] is missing hosts.");
+        }
+
         return $connections[$name];
     }
 
     /**
      * Remove a connection from the cache.
      *
-     * This forces the connection to be recreated on the next access.
+     * This forces the connection to be recreated on the next access. Any
+     * container singletons holding a resolved client are forgotten as well,
+     * so subsequent resolutions rebuild against a fresh connection.
      *
      * @param  string  $name  The connection name to purge
      */
     public function purge(string $name): void
     {
         unset($this->connections[$name]);
+
+        $this->forgetContainerInstances();
     }
 
     /**
      * Clear all cached connections.
      *
      * This will force all connections to be recreated on their next access.
+     * Any container singletons holding a resolved client are forgotten as
+     * well, so subsequent resolutions rebuild against fresh connections.
      */
     public function disconnect(): void
     {
         $this->connections = [];
+
+        $this->forgetContainerInstances();
+    }
+
+    /**
+     * Forget container singletons that hold a resolved Elasticsearch client.
+     *
+     * Long-running runtimes (Octane, queue workers) resolve the client
+     * singletons once; after a purge those instances would keep pointing at
+     * a stale connection. No-op when the bound application does not support
+     * forgetting instances (e.g. minimal container stubs outside Laravel).
+     */
+    protected function forgetContainerInstances(): void
+    {
+        if (! method_exists($this->app, 'forgetInstance')) {
+            return;
+        }
+
+        foreach ([Client::class, ClientContract::class, 'stretch'] as $abstract) {
+            $this->app->forgetInstance($abstract);
+        }
     }
 }

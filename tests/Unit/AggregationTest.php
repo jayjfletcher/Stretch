@@ -193,15 +193,48 @@ it('can set a filtered raw aggregation', function () {
         ->and($built['aggs']['brand']['terms']['field'])->toBe('brand');
 });
 
-it('raw aggregation bypasses size and order logic', function () {
+it('raw aggregation without size and order is left untouched', function () {
     $agg = new AggregationBuilder;
 
-    $agg->raw(['custom_agg' => ['field' => 'test']])
-        ->size(999)
-        ->orderBy('_count', 'desc');
+    $agg->raw(['custom_agg' => ['field' => 'test']]);
+
+    expect($agg->build())->toBe(['custom_agg' => ['field' => 'test']]);
+});
+
+it('applies order to histogram aggregations', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->histogram('price', 50)->orderBy('_key', 'desc');
 
     $built = $agg->build();
 
-    // size and order only apply to terms aggregations, raw should be untouched
-    expect($built)->toBe(['custom_agg' => ['field' => 'test']]);
+    expect($built['histogram']['order'])->toBe(['_key' => ['order' => 'desc']]);
+});
+
+it('applies order to date histogram aggregations', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->dateHistogram('created_at', 'month')->orderBy('_count', 'asc');
+
+    $built = $agg->build();
+
+    expect($built['date_histogram']['order'])->toBe(['_count' => ['order' => 'asc']]);
+});
+
+it('throws when size is set on a non-terms aggregation', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->avg('price')->size(10);
+
+    expect(fn () => $agg->build())
+        ->toThrow(LogicException::class, 'size() is only supported on terms aggregations');
+});
+
+it('throws when order is set on an aggregation that does not support it', function () {
+    $agg = new AggregationBuilder;
+
+    $agg->avg('price')->orderBy('_count', 'desc');
+
+    expect(fn () => $agg->build())
+        ->toThrow(LogicException::class, 'orderBy() is only supported on terms, histogram, and date_histogram aggregations');
 });

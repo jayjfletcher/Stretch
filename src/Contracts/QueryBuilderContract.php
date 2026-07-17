@@ -356,16 +356,17 @@ interface QueryBuilderContract
      * Add a raw query clause to the builder.
      *
      * @param  array  $query  The query clause to add
+     * @return int The index of the added clause, usable with replaceQuery()
      */
-    public function addQuery(array $query): void;
+    public function addQuery(array $query): int;
 
     /**
-     * Update an existing range query for a specific field.
+     * Replace a previously added query clause by its index.
      *
-     * @param  string  $field  The field name of the range query to update
-     * @param  array  $rangeQuery  The updated range query
+     * @param  int  $index  The clause index returned by addQuery()
+     * @param  array  $query  The replacement query clause
      */
-    public function updateLastRangeQuery(string $field, array $rangeQuery): void;
+    public function replaceQuery(int $index, array $query): void;
 
     /**
      * Return the query's index

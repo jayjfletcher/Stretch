@@ -2,15 +2,19 @@
 
 declare(strict_types=1);
 
+use Elastic\Elasticsearch\ClientBuilder;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
 use JayI\Stretch\Builders\MultiQueryBuilder;
 use JayI\Stretch\Contracts\ClientContract;
+use JayI\Stretch\ElasticsearchManager;
 
 beforeEach(function () {
+    config(['stretch.cache.enabled' => false]);
     config(['stretch.cache.ttl' => [300, 600]]);
     config(['stretch.cache.prefix' => '']);
-    config(['stretch.cache.store' => 'default']);
+    config(['stretch.cache.store' => 'array']);
 });
 
 it('can enable caching with cache method', function () {
@@ -186,41 +190,35 @@ it('getIndexes returns unique indexes for multi query builder', function () {
     expect($indexes->count())->toBe(2);
 });
 
-it('__call method returns callback result for non-execute methods', function () {
-    $builder = new class extends ElasticsearchQueryBuilder
-    {
-        public function callMagic(string $name, array $arguments)
-        {
-            return $this->__call($name, $arguments);
-        }
+it('errors on calls to undefined methods', function () {
+    $builder = new ElasticsearchQueryBuilder;
 
-        public function customMethod(): string
-        {
-            return 'custom_result';
-        }
-    };
+    $caught = null;
 
-    $builder->cache();
+    try {
+        $builder->definitelyNotAMethod();
+    } catch (Error $e) {
+        $caught = $e;
+    }
 
-    $result = $builder->callMagic('customMethod', []);
-
-    expect($result)->toBe('custom_result');
+    expect($caught)->toBeInstanceOf(Error::class)
+        ->and($caught->getMessage())->toContain('definitelyNotAMethod');
 });
 
-it('clears cache when clearCache is called', function () {
-    $builder = new ElasticsearchQueryBuilder;
-    $builder->index('test_index')
-        ->match('title', 'Laravel')
-        ->clearCache();
+it('forgets the cached entry before executing when clearCache is set', function () {
+    $mockClient = Mockery::mock(ClientContract::class);
+    $mockClient->shouldReceive('search')
+        ->twice()
+        ->andReturn(['hits' => ['total' => ['value' => 1]]]);
 
-    Cache::shouldReceive('store')
-        ->with('default')
-        ->andReturnSelf();
+    // Prime the cache with a first execution.
+    $builder = new ElasticsearchQueryBuilder($mockClient);
+    $builder->index('test_index')->match('title', 'Laravel')->cache()->execute();
 
-    Cache::shouldReceive('forget')
-        ->once();
-
-    $builder->getCacheKey($builder->getCacheClear());
+    // A second builder with the same query would normally hit the cache;
+    // clearCache() forces the entry out so the client is hit again.
+    $cleared = new ElasticsearchQueryBuilder($mockClient);
+    $cleared->index('test_index')->match('title', 'Laravel')->cache()->clearCache()->execute();
 });
 
 it('executes without caching when cache is disabled', function () {
@@ -268,4 +266,142 @@ it('multi query builder can use caching', function () {
 
     expect($multiBuilder->isCacheEnabled())->toBeTrue();
     expect($multiBuilder->getCacheTtl())->toBe([300, 600]);
+});
+
+it('respects the cache.enabled config default', function () {
+    config(['stretch.cache.enabled' => true]);
+
+    $builder = new ElasticsearchQueryBuilder;
+
+    expect($builder->isCacheEnabled())->toBeTrue();
+
+    // An explicit per-query setting overrides the config default.
+    $builder->setCacheEnabled(false);
+
+    expect($builder->isCacheEnabled())->toBeFalse();
+});
+
+it('parses comma-separated cache TTL strings from the environment', function () {
+    config(['stretch.cache.ttl' => '300,600']);
+
+    $builder = new ElasticsearchQueryBuilder;
+
+    expect($builder->getCacheTtl())->toBe([300, 600]);
+
+    config(['stretch.cache.ttl' => '300']);
+
+    expect($builder->getCacheTtl())->toBe(300);
+});
+
+it('serves the second execution from cache without hitting the client', function () {
+    $mockClient = Mockery::mock(ClientContract::class);
+    $mockClient->shouldReceive('search')
+        ->once()
+        ->andReturn(['hits' => ['total' => ['value' => 3]]]);
+
+    $builder = new ElasticsearchQueryBuilder($mockClient);
+    $builder->index('test_index')
+        ->match('title', 'Laravel')
+        ->cache()
+        ->setCacheTtl(300);
+
+    $first = $builder->execute();
+    $second = $builder->execute();
+
+    expect($first)->toBe(['hits' => ['total' => ['value' => 3]]])
+        ->and($second)->toBe($first);
+});
+
+it('hits the client on every execution when cache is disabled', function () {
+    $mockClient = Mockery::mock(ClientContract::class);
+    $mockClient->shouldReceive('search')
+        ->twice()
+        ->andReturn(['hits' => ['total' => ['value' => 1]]]);
+
+    $builder = new ElasticsearchQueryBuilder($mockClient);
+    $builder->index('test_index')->match('title', 'Laravel');
+
+    $builder->execute();
+    $builder->execute();
+});
+
+it('uses flexible caching for TTL pairs and remember for scalar TTLs', function () {
+    $mockClient = Mockery::mock(ClientContract::class);
+    $mockClient->shouldReceive('search')->andReturn(['hits' => []]);
+
+    $repository = Mockery::mock(Repository::class);
+    Cache::shouldReceive('store')->with('array')->andReturn($repository);
+
+    $repository->shouldReceive('flexible')
+        ->once()
+        ->withArgs(fn ($key, $ttl, $callback) => $ttl === [300, 600])
+        ->andReturn(['hits' => []]);
+
+    (new ElasticsearchQueryBuilder($mockClient))
+        ->index('test_index')
+        ->match('title', 'Laravel')
+        ->cache()
+        ->setCacheTtl([300, 600])
+        ->execute();
+
+    $repository->shouldReceive('remember')
+        ->once()
+        ->withArgs(fn ($key, $ttl, $callback) => $ttl === 120)
+        ->andReturn(['hits' => []]);
+
+    (new ElasticsearchQueryBuilder($mockClient))
+        ->index('test_index')
+        ->match('title', 'Laravel')
+        ->cache()
+        ->setCacheTtl(120)
+        ->execute();
+});
+
+it('includes the connection name in the cache key', function () {
+    $manager = Mockery::mock(ElasticsearchManager::class);
+    $manager->shouldReceive('getDefaultConnection')->andReturn('default');
+    $manager->shouldReceive('connection')->with('analytics')
+        ->andReturn(ClientBuilder::create()->setHosts(['localhost:9200'])->build());
+
+    $defaultBuilder = (new ElasticsearchQueryBuilder(Mockery::mock(ClientContract::class), $manager))
+        ->index('posts')
+        ->match('title', 'Laravel');
+
+    $analyticsBuilder = $defaultBuilder->connection('analytics');
+
+    expect($defaultBuilder->getCacheKey())->not->toBe($analyticsBuilder->getCacheKey())
+        ->and($analyticsBuilder->getCacheKey())->toContain('analytics');
+});
+
+it('generates cache keys for array indices without errors', function () {
+    $builder = new ElasticsearchQueryBuilder;
+    $builder->index(['posts', 'comments'])->match('title', 'Laravel');
+
+    expect($builder->getCacheKey())->toContain('posts,comments');
+});
+
+it('generates cache keys for multi queries with array indices', function () {
+    $multiBuilder = new MultiQueryBuilder;
+    $multiBuilder->add('everything', fn ($q) => $q->index(['posts', 'comments'])->match('title', 'Laravel'));
+
+    expect($multiBuilder->getCacheKey())->toContain('posts,comments');
+});
+
+it('serves cached multi-search results without hitting the client', function () {
+    $mockClient = Mockery::mock(ClientContract::class);
+    $mockClient->shouldReceive('msearch')
+        ->once()
+        ->andReturn(['responses' => [['hits' => ['total' => ['value' => 5]]]]]);
+
+    $multiBuilder = new MultiQueryBuilder($mockClient);
+    $multiBuilder
+        ->add('posts', fn ($q) => $q->index('posts')->match('title', 'Laravel'))
+        ->cache()
+        ->setCacheTtl(300);
+
+    $first = $multiBuilder->execute();
+    $second = $multiBuilder->execute();
+
+    expect($second)->toBe($first)
+        ->and($first['responses'])->toHaveKey('posts');
 });

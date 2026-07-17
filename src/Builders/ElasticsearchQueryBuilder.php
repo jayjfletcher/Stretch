@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace JayI\Stretch\Builders;
 
+use Illuminate\Container\Container;
 use JayI\Stretch\Builders\Concerns\IsCacheable;
-use JayI\Stretch\Client\ElasticsearchClient;
+use JayI\Stretch\Builders\Concerns\SwitchesConnections;
+use JayI\Stretch\Builders\Concerns\TracksLastQuery;
 use JayI\Stretch\Contracts\BoolQueryBuilderContract;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
@@ -25,6 +27,8 @@ use JayI\Stretch\Exceptions\StretchException;
 class ElasticsearchQueryBuilder implements QueryBuilderContract
 {
     use IsCacheable;
+    use SwitchesConnections;
+    use TracksLastQuery;
 
     /**
      * Query clauses to be combined in the final query.
@@ -93,11 +97,6 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     protected array $postFilters = [];
 
     /**
-     * Whether query caching is enabled.
-     */
-    protected bool $cache = false;
-
-    /**
      * Top-level kNN search clauses for vector similarity search.
      *
      * @var array<int, array>
@@ -131,15 +130,6 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     protected ?array $collapse = null;
 
     /**
-     * The parameters sent to the client on the most recent execute() call.
-     *
-     * Contains the `index` and `body` keys exactly as they were passed to
-     * the Elasticsearch client — useful for debugging and logging. Null
-     * until the first execute() on this builder instance.
-     */
-    protected ?array $lastQuery = null;
-
-    /**
      * Create a new ElasticsearchQueryBuilder instance.
      *
      * @param  ClientContract|null  $client  The Elasticsearch client for query execution
@@ -170,36 +160,6 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
         $this->index = $index;
 
         return $this;
-    }
-
-    /**
-     * Switch to a specific Elasticsearch connection.
-     *
-     * Creates a new query builder instance using the specified connection name.
-     * This allows building queries against different Elasticsearch clusters or configurations.
-     *
-     * @param  string  $name  The connection name as defined in configuration
-     * @return static A new query builder instance using the specified connection
-     *
-     * @throws \RuntimeException If the manager is not available
-     *
-     * @example
-     * ```php
-     * Stretch::query()
-     *     ->connection('logs')
-     *     ->match('level', 'error')
-     *     ->execute();
-     * ```
-     */
-    public function connection(string $name): static
-    {
-        if (! $this->manager) {
-            throw new \RuntimeException('Elasticsearch manager not available. Cannot switch connections.');
-        }
-
-        $client = new ElasticsearchClient($this->manager->connection($name));
-
-        return new static($client, $this->manager);
     }
 
     /**
@@ -461,6 +421,8 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *
      * Required when querying fields of nested object type.
      * The callback receives a fresh query builder for the nested context.
+     * When the callback adds no query clauses, the nested clause is skipped
+     * entirely to avoid emitting invalid DSL.
      *
      * @param  string  $path  The path to the nested object field
      * @param  callable  $callback  Callback receiving a query builder for the nested query
@@ -478,10 +440,16 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
         $nestedQuery = new ElasticsearchQueryBuilder($this->client, $this->manager);
         $callback($nestedQuery);
 
+        $query = $nestedQuery->build()['query'] ?? null;
+
+        if ($query === null) {
+            return $this;
+        }
+
         $this->addQueryProtected([
             'nested' => [
                 'path' => $path,
-                'query' => $nestedQuery->build()['query'],
+                'query' => $query,
             ],
         ]);
 
@@ -1003,6 +971,7 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *
      * Filter clauses must match but don't contribute to scoring.
      * They are cached by Elasticsearch for better performance.
+     * When the callback adds no query clauses, no filter is added.
      *
      * @param  callable  $callback  Callback receiving a query builder for the filter
      * @return static Returns the builder instance for method chaining
@@ -1018,7 +987,12 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     {
         $filterQuery = new ElasticsearchQueryBuilder($this->client, $this->manager);
         $callback($filterQuery);
-        $this->filters[] = $filterQuery->build()['query'];
+
+        $query = $filterQuery->build()['query'] ?? null;
+
+        if ($query !== null) {
+            $this->filters[] = $query;
+        }
 
         return $this;
     }
@@ -1051,7 +1025,12 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     {
         $postFilterQuery = new ElasticsearchQueryBuilder($this->client, $this->manager);
         $callback($postFilterQuery);
-        $this->postFilters[] = $postFilterQuery->build()['query'];
+
+        $query = $postFilterQuery->build()['query'] ?? null;
+
+        if ($query !== null) {
+            $this->postFilters[] = $query;
+        }
 
         return $this;
     }
@@ -1202,7 +1181,8 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      * Execute the query and return results.
      *
      * Sends the built query to Elasticsearch and returns the response.
-     * If caching is enabled (via the IsCacheable trait), results may be cached.
+     * When caching is enabled (via the IsCacheable trait), the response is
+     * served from and stored in the configured cache store.
      *
      * @return array The Elasticsearch search response
      *
@@ -1228,13 +1208,28 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
 
         $this->lastQuery = $params;
 
-        return $this->client->search($params);
+        return $this->executeWithCache(fn (): array => $this->client->search($params));
     }
 
+    /**
+     * Delete all documents matching the built query.
+     *
+     * Uses the delete-by-query API. When no query clauses are set, all
+     * documents in the index are deleted via match_all.
+     *
+     * @return array The delete-by-query response
+     *
+     * @throws \RuntimeException If the client is not set
+     * @throws StretchException If no index is set or the operation fails
+     */
     public function delete(): array
     {
         if (! $this->client) {
             throw new \RuntimeException('Client not set. Cannot execute query.');
+        }
+
+        if (! $this->getIndex()) {
+            throw new StretchException('Index required. Cannot delete by query without an index.');
         }
 
         $body = $this->build();
@@ -1289,30 +1284,29 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      * their constructed queries to the parent builder.
      *
      * @param  array  $query  The query clause to add
+     * @return int The index of the added clause, usable with replaceQuery()
      */
-    public function addQuery(array $query): void
+    public function addQuery(array $query): int
     {
         $this->query[] = $query;
+
+        return array_key_last($this->query);
     }
 
     /**
-     * Update an existing range query for a specific field.
+     * Replace a previously added query clause by its index.
      *
      * Used by RangeQueryBuilder when chaining multiple conditions
-     * (e.g., gte()->lte()) to update the existing range query
-     * rather than adding a new one.
+     * (e.g., gte()->lte()) so each sub-builder updates its own clause,
+     * even when multiple builders for the same field are interleaved.
      *
-     * @param  string  $field  The field name of the range query to update
-     * @param  array  $rangeQuery  The updated range query
+     * @param  int  $index  The clause index returned by addQuery()
+     * @param  array  $query  The replacement query clause
      */
-    public function updateLastRangeQuery(string $field, array $rangeQuery): void
+    public function replaceQuery(int $index, array $query): void
     {
-        // Find and update the last range query for this field
-        for ($i = count($this->query) - 1; $i >= 0; $i--) {
-            if (isset($this->query[$i]['range'][$field])) {
-                $this->query[$i] = $rangeQuery;
-                break;
-            }
+        if (array_key_exists($index, $this->query)) {
+            $this->query[$index] = $query;
         }
     }
 
@@ -1338,12 +1332,31 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
     }
 
     /**
-     * Return the query's size
+     * Return the query's size.
+     *
+     * The size is clamped to `stretch.query.max_size`. When the Laravel
+     * config repository is unavailable (e.g. the builder is used outside a
+     * booted application), defaults of 10 (size) and 10,000 (max) apply.
      */
     public function getSize(): int
     {
-        return min(($this->size ?? config('stretch.query.default_size')), config('stretch.query.max_size'));
+        $default = $this->getConfigInt('stretch.query.default_size', 10);
+        $max = $this->getConfigInt('stretch.query.max_size', 10000);
 
+        return min($this->size ?? $default, $max);
+    }
+
+    /**
+     * Read an integer config value, falling back to the given default when
+     * the config repository is not bound (e.g. outside a booted app).
+     */
+    protected function getConfigInt(string $key, int $default): int
+    {
+        if (! function_exists('config') || ! Container::getInstance()->bound('config')) {
+            return $default;
+        }
+
+        return (int) (config($key) ?? $default);
     }
 
     /**

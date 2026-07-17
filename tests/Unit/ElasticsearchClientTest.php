@@ -412,13 +412,17 @@ it('preserves original exception as previous in StretchException', function () {
         throw $originalException;
     };
 
+    $caught = null;
+
     try {
         $client->search(['index' => 'test']);
-        test()->fail('Expected StretchException was not thrown');
     } catch (StretchException $e) {
-        expect($e->getPrevious())->toBe($originalException);
-        expect($e->getMessage())->toContain('Original error');
+        $caught = $e;
     }
+
+    expect($caught)->toBeInstanceOf(StretchException::class)
+        ->and($caught->getPrevious())->toBe($originalException)
+        ->and($caught->getMessage())->toContain('Original error');
 });
 
 it('can successfully search and return results', function () {

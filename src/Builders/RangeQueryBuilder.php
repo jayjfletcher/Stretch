@@ -46,9 +46,10 @@ class RangeQueryBuilder implements RangeQueryBuilderContract
     protected ?string $format = null;
 
     /**
-     * Whether this range query has been added to the parent.
+     * The index of this range clause within the parent builder's query list,
+     * or null when no bound has been added to the parent yet.
      */
-    protected bool $addedToParent = false;
+    protected ?int $parentQueryIndex = null;
 
     /**
      * Create a new RangeQueryBuilder instance.
@@ -121,6 +122,8 @@ class RangeQueryBuilder implements RangeQueryBuilderContract
      * Set the timezone for date range queries.
      *
      * Dates will be converted from this timezone to UTC for comparison.
+     * The clause is only attached to the parent once at least one bound
+     * (gt/gte/lt/lte) has been added.
      *
      * @param  string  $timezone  IANA timezone (e.g., "America/New_York")
      * @return static Returns the builder instance for method chaining
@@ -135,6 +138,9 @@ class RangeQueryBuilder implements RangeQueryBuilderContract
 
     /**
      * Set the date format for parsing date strings.
+     *
+     * The clause is only attached to the parent once at least one bound
+     * (gt/gte/lt/lte) has been added.
      *
      * @param  string  $format  Elasticsearch date format pattern
      * @return static Returns the builder instance for method chaining
@@ -184,17 +190,22 @@ class RangeQueryBuilder implements RangeQueryBuilderContract
     /**
      * Add or update this range query in the parent builder.
      *
-     * On first call, adds the query to the parent. On subsequent calls,
-     * updates the existing range query to include new conditions.
+     * Nothing is attached until at least one bound (gt/gte/lt/lte) exists,
+     * so timezone()/format() calls alone never emit an invalid clause. On
+     * first attachment the clause index is remembered, and subsequent calls
+     * replace that exact clause — keeping interleaved range builders for the
+     * same field independent of each other.
      */
     protected function addToParent(): void
     {
-        if (! $this->addedToParent) {
-            $this->getParent()->addQuery($this->build());
-            $this->addedToParent = true;
+        if ($this->conditions === []) {
+            return;
+        }
+
+        if ($this->parentQueryIndex === null) {
+            $this->parentQueryIndex = $this->getParent()->addQuery($this->build());
         } else {
-            // Update the existing range query in the parent
-            $this->getParent()->updateLastRangeQuery($this->field, $this->build());
+            $this->getParent()->replaceQuery($this->parentQueryIndex, $this->build());
         }
     }
 }
