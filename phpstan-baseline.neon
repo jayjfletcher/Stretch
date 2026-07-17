@@ -1,0 +1,121 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 20
+			path: config/stretch.php
+
+		-
+			message: '#^Access to an undefined property Pest\\PendingCalls\\TestCall\:\:\$app\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Call to function method_exists\(\) with JayI\\Stretch\\Builders\\ElasticsearchQueryBuilder and ''connection'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Call to function method_exists\(\) with JayI\\Stretch\\Stretch and ''connection'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Builders\\ElasticsearchQueryBuilder constructor expects JayI\\Stretch\\Contracts\\ClientContract\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 3
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Stretch constructor expects JayI\\Stretch\\Contracts\\ClientContract, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 2
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Parameter \#2 \$manager of class JayI\\Stretch\\Builders\\ElasticsearchQueryBuilder constructor expects JayI\\Stretch\\ElasticsearchManager\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Parameter \#2 \$manager of class JayI\\Stretch\\Stretch constructor expects JayI\\Stretch\\ElasticsearchManager\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/MultiConnectionTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:once\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/StretchTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:with\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/StretchTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Stretch constructor expects JayI\\Stretch\\Contracts\\ClientContract, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 11
+			path: tests/Feature/StretchTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:once\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/CacheableTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Builders\\ElasticsearchQueryBuilder constructor expects JayI\\Stretch\\Contracts\\ClientContract\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Unit/CacheableTest.php
+
+		-
+			message: '#^Call to an undefined method Pest\\PendingCalls\\TestCall\|Pest\\Support\\HigherOrderTapProxy\:\:fail\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ElasticsearchClientTest.php
+
+		-
+			message: '#^Access to an undefined property Pest\\PendingCalls\\TestCall\:\:\$app\.$#'
+			identifier: property.notFound
+			count: 7
+			path: tests/Unit/ElasticsearchManagerTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:once\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Unit/ExecuteQueryTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:twice\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ExecuteQueryTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Builders\\ElasticsearchQueryBuilder constructor expects JayI\\Stretch\\Contracts\\ClientContract\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 8
+			path: tests/Unit/ExecuteQueryTest.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:once\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/MultiQueryBuilderTest.php
+
+		-
+			message: '#^Parameter \#1 \$client of class JayI\\Stretch\\Builders\\MultiQueryBuilder constructor expects JayI\\Stretch\\Contracts\\ClientContract\|null, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 5
+			path: tests/Unit/MultiQueryBuilderTest.php

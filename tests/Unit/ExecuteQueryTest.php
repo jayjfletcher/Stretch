@@ -173,4 +173,4 @@ it('delete() uses match_all when no query clauses set', function () {
 
 it('delete() throws when client not set', function () {
     (new ElasticsearchQueryBuilder)->index('posts')->term('status', 'draft')->delete();
-})->throws(\RuntimeException::class);
+})->throws(RuntimeException::class);

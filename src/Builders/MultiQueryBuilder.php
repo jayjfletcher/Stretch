@@ -38,8 +38,6 @@ class MultiQueryBuilder implements MultiQueryBuilderContract
      *
      * Contains the `body` array exactly as it was passed to `_msearch`.
      * Null until the first execute() on this builder instance.
-     *
-     * @var array|null
      */
     protected ?array $lastQuery = null;
 

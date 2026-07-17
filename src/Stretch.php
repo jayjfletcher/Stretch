@@ -333,7 +333,7 @@ class Stretch
      */
     public function deleteByQuery(string $index, callable $callback): array
     {
-        $builder = new \JayI\Stretch\Builders\ElasticsearchQueryBuilder;
+        $builder = new ElasticsearchQueryBuilder;
         $callback($builder);
 
         return $this->client->deleteByQuery([

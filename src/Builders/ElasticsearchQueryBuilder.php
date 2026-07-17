@@ -136,8 +136,6 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      * Contains the `index` and `body` keys exactly as they were passed to
      * the Elasticsearch client — useful for debugging and logging. Null
      * until the first execute() on this builder instance.
-     *
-     * @var array|null
      */
     protected ?array $lastQuery = null;
 

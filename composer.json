@@ -64,10 +64,16 @@
             "@composer run build",
             "@php vendor/bin/testbench serve"
         ],
-        "analyse": "vendor/bin/phpstan analyse src",
+        "analyse": "@phpstan",
         "test": "vendor/bin/pest",
         "test-coverage": "vendor/bin/pest --coverage",
-        "format": "vendor/bin/pint"
+        "format": "@pint",
+        "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
+        "pint": "vendor/bin/pint -v --preset laravel",
+        "pint:test": "vendor/bin/pint --test --preset laravel",
+        "post-install-cmd": [
+            "@php bin/install-git-hooks.php"
+        ]
     },
     "config": {
         "optimize-autoloader": true,
