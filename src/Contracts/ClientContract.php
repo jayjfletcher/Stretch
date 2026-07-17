@@ -153,6 +153,97 @@ interface ClientContract
     public function msearch(array $params): array;
 
     /**
+     * Count documents matching a query via the _count API.
+     *
+     * @param  array  $params  Count parameters (index, body)
+     * @return array The count response containing a 'count' key
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function count(array $params): array;
+
+    /**
+     * Update documents matching a query via the _update_by_query API.
+     *
+     * @param  array  $params  Update-by-query parameters (index, body)
+     * @return array The update-by-query response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function updateByQuery(array $params): array;
+
+    /**
+     * Open a point-in-time for consistent deep pagination.
+     *
+     * @param  string  $index  The index (or pattern) to freeze
+     * @param  string  $keepAlive  How long to keep the PIT alive (e.g. '1m')
+     * @return array The response containing the PIT 'id'
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function openPointInTime(string $index, string $keepAlive): array;
+
+    /**
+     * Close a previously opened point-in-time.
+     *
+     * @param  string  $id  The PIT id to close
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function closePointInTime(string $id): array;
+
+    /**
+     * Analyze text with an analyzer via the _analyze API.
+     *
+     * @param  array  $params  Analyze parameters (index optional, body)
+     * @return array The analyze response containing tokens
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function analyze(array $params): array;
+
+    /**
+     * Explain why a document matches (or not) a query via the _explain API.
+     *
+     * @param  array  $params  Explain parameters (index, id, body)
+     * @return array The explain response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function explain(array $params): array;
+
+    /**
+     * Retrieve term vectors for a document via the _termvectors API.
+     *
+     * @param  array  $params  Term-vectors parameters (index, id, body/fields)
+     * @return array The term-vectors response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function termvectors(array $params): array;
+
+    /**
+     * Continue a scroll search via the _search/scroll API.
+     *
+     * @param  array  $params  Scroll parameters (scroll_id, scroll)
+     * @return array The next batch of scroll results
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function scroll(array $params): array;
+
+    /**
+     * Clear one or more scroll contexts.
+     *
+     * @param  array  $params  Clear-scroll parameters (scroll_id)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function clearScroll(array $params): array;
+
+    /**
      * Create or update a synonym set.
      *
      * @param  string  $id  The synonym set id

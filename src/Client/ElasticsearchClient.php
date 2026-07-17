@@ -297,6 +297,165 @@ class ElasticsearchClient implements ClientContract
     }
 
     /**
+     * Count documents matching a query.
+     *
+     * @param  array  $params  Count parameters (index, body)
+     * @return array The count response containing a 'count' key
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function count(array $params): array
+    {
+        try {
+            return $this->client->count($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Count operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Update documents matching a query.
+     *
+     * @param  array  $params  Update-by-query parameters (index, body)
+     * @return array The update-by-query response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function updateByQuery(array $params): array
+    {
+        try {
+            return $this->client->updateByQuery($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Update by query failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Open a point-in-time for consistent deep pagination.
+     *
+     * @param  string  $index  The index (or pattern) to freeze
+     * @param  string  $keepAlive  How long to keep the PIT alive (e.g. '1m')
+     * @return array The response containing the PIT 'id'
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function openPointInTime(string $index, string $keepAlive): array
+    {
+        try {
+            return $this->client->openPointInTime([
+                'index' => $index,
+                'keep_alive' => $keepAlive,
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to open point-in-time for '{$index}': {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Close a previously opened point-in-time.
+     *
+     * @param  string  $id  The PIT id to close
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function closePointInTime(string $id): array
+    {
+        try {
+            return $this->client->closePointInTime([
+                'body' => ['id' => $id],
+            ])->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Failed to close point-in-time: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Analyze text with an analyzer.
+     *
+     * @param  array  $params  Analyze parameters (index optional, body)
+     * @return array The analyze response containing tokens
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function analyze(array $params): array
+    {
+        try {
+            return $this->client->indices()->analyze($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Analyze operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Explain why a document matches (or not) a query.
+     *
+     * @param  array  $params  Explain parameters (index, id, body)
+     * @return array The explain response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function explain(array $params): array
+    {
+        try {
+            return $this->client->explain($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Explain operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Retrieve term vectors for a document.
+     *
+     * @param  array  $params  Term-vectors parameters (index, id, body/fields)
+     * @return array The term-vectors response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function termvectors(array $params): array
+    {
+        try {
+            return $this->client->termvectors($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Term vectors operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Continue a scroll search.
+     *
+     * @param  array  $params  Scroll parameters (scroll_id, scroll)
+     * @return array The next batch of scroll results
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function scroll(array $params): array
+    {
+        try {
+            return $this->client->scroll($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Scroll operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
+     * Clear one or more scroll contexts.
+     *
+     * @param  array  $params  Clear-scroll parameters (scroll_id)
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function clearScroll(array $params): array
+    {
+        try {
+            return $this->client->clearScroll($params)->asArray();
+        } catch (Exception $exception) {
+            throw new StretchException("Clear scroll operation failed: {$exception->getMessage()}", (int) $exception->getCode(), $exception);
+        }
+    }
+
+    /**
      * Create or update a synonym set.
      *
      * @param  string  $id  The synonym set id

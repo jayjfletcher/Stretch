@@ -325,6 +325,260 @@ class AggregationBuilder implements AggregationBuilderContract
     }
 
     /**
+     * Create a percentiles metric aggregation.
+     *
+     * @param  string  $field  The numeric field
+     * @param  array|null  $percents  The percentiles to compute (defaults to ES defaults)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function percentiles(string $field, ?array $percents = null): static
+    {
+        $percentiles = ['field' => $field];
+
+        if ($percents !== null) {
+            $percentiles['percents'] = $percents;
+        }
+
+        $this->aggregation = ['percentiles' => $percentiles];
+
+        return $this;
+    }
+
+    /**
+     * Create an extended_stats metric aggregation.
+     *
+     * Returns the stats plus variance, std deviation, and bounds.
+     *
+     * @param  string  $field  The numeric field
+     * @return static Returns the builder instance for method chaining
+     */
+    public function extendedStats(string $field): static
+    {
+        $this->aggregation = ['extended_stats' => ['field' => $field]];
+
+        return $this;
+    }
+
+    /**
+     * Create a geo_bounds metric aggregation (bounding box of geo points).
+     *
+     * @param  string  $field  The geo_point field
+     * @return static Returns the builder instance for method chaining
+     */
+    public function geoBounds(string $field): static
+    {
+        $this->aggregation = ['geo_bounds' => ['field' => $field]];
+
+        return $this;
+    }
+
+    /**
+     * Create a geo_centroid metric aggregation (weighted centroid of geo points).
+     *
+     * @param  string  $field  The geo_point field
+     * @return static Returns the builder instance for method chaining
+     */
+    public function geoCentroid(string $field): static
+    {
+        $this->aggregation = ['geo_centroid' => ['field' => $field]];
+
+        return $this;
+    }
+
+    /**
+     * Create a filter bucket aggregation.
+     *
+     * Wraps sub-aggregations so they run only over documents matching the
+     * given filter. The callback builds the filter query.
+     *
+     * @param  callable  $callback  Callback receiving a query builder for the filter
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $agg->filter(fn ($q) => $q->term('status', 'published'))
+     *     ->subAggregation('avg_price', fn ($s) => $s->avg('price'));
+     * ```
+     */
+    public function filter(callable $callback): static
+    {
+        $inner = new ElasticsearchQueryBuilder;
+        $callback($inner);
+
+        $this->aggregation = [
+            'filter' => $inner->build()['query'] ?? ['match_all' => (object) []],
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a nested bucket aggregation over a nested field path.
+     *
+     * @param  string  $path  The nested field path
+     * @return static Returns the builder instance for method chaining
+     */
+    public function nested(string $path): static
+    {
+        $this->aggregation = ['nested' => ['path' => $path]];
+
+        return $this;
+    }
+
+    /**
+     * Create a derivative pipeline aggregation.
+     *
+     * Computes the derivative of a metric across the buckets of the parent
+     * histogram/date_histogram. Must be used as a sub-aggregation.
+     *
+     * @param  string  $bucketsPath  Path to the metric (e.g. 'sales')
+     * @param  array  $options  Extra options (gap_policy, unit, format)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function derivative(string $bucketsPath, array $options = []): static
+    {
+        $this->aggregation = [
+            'derivative' => array_merge(['buckets_path' => $bucketsPath], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a cumulative_sum pipeline aggregation.
+     *
+     * @param  string  $bucketsPath  Path to the metric to accumulate
+     * @param  array  $options  Extra options (format)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function cumulativeSum(string $bucketsPath, array $options = []): static
+    {
+        $this->aggregation = [
+            'cumulative_sum' => array_merge(['buckets_path' => $bucketsPath], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a moving_fn pipeline aggregation.
+     *
+     * Applies a script over a sliding window of the parent buckets.
+     *
+     * @param  string  $bucketsPath  Path to the metric
+     * @param  string  $script  The window script (e.g. 'MovingFunctions.unweightedAvg(values)')
+     * @param  int  $window  The window size
+     * @param  array  $options  Extra options (gap_policy, shift)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function movingFn(string $bucketsPath, string $script, int $window, array $options = []): static
+    {
+        $this->aggregation = [
+            'moving_fn' => array_merge([
+                'buckets_path' => $bucketsPath,
+                'script' => $script,
+                'window' => $window,
+            ], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a bucket_script pipeline aggregation.
+     *
+     * Computes a per-bucket metric from sibling aggregations via a script.
+     *
+     * @param  array  $bucketsPath  Map of script variable to sibling metric path
+     * @param  string  $script  The script combining the paths
+     * @param  array  $options  Extra options (gap_policy, format)
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $agg->bucketScript(
+     *     ['sales' => 'total_sales', 'count' => '_count'],
+     *     'params.sales / params.count',
+     * );
+     * ```
+     */
+    public function bucketScript(array $bucketsPath, string $script, array $options = []): static
+    {
+        $this->aggregation = [
+            'bucket_script' => array_merge([
+                'buckets_path' => $bucketsPath,
+                'script' => $script,
+            ], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a bucket_selector pipeline aggregation.
+     *
+     * Filters out parent buckets whose script evaluates to false.
+     *
+     * @param  array  $bucketsPath  Map of script variable to sibling metric path
+     * @param  string  $script  A boolean script deciding whether to keep the bucket
+     * @param  array  $options  Extra options (gap_policy)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function bucketSelector(array $bucketsPath, string $script, array $options = []): static
+    {
+        $this->aggregation = [
+            'bucket_selector' => array_merge([
+                'buckets_path' => $bucketsPath,
+                'script' => $script,
+            ], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a bucket_sort pipeline aggregation for sorting/paginating buckets.
+     *
+     * @param  array  $sort  Sort clauses over sibling metrics or bucket keys
+     * @param  array  $options  Extra options (from, size, gap_policy)
+     * @return static Returns the builder instance for method chaining
+     *
+     * @example
+     * ```php
+     * $agg->bucketSort([['total_sales' => ['order' => 'desc']]], ['size' => 5]);
+     * ```
+     */
+    public function bucketSort(array $sort, array $options = []): static
+    {
+        $this->aggregation = [
+            'bucket_sort' => array_merge(['sort' => $sort], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Create a sibling pipeline aggregation over a metric across buckets.
+     *
+     * Supports avg_bucket, sum_bucket, min_bucket, max_bucket, and
+     * stats_bucket. Must sit as a sibling of the referenced multi-bucket
+     * aggregation.
+     *
+     * @param  string  $type  One of avg_bucket, sum_bucket, min_bucket, max_bucket, stats_bucket
+     * @param  string  $bucketsPath  Path to the metric (e.g. 'sales_per_month>sales')
+     * @param  array  $options  Extra options (gap_policy, format)
+     * @return static Returns the builder instance for method chaining
+     */
+    public function pipelineBucket(string $type, string $bucketsPath, array $options = []): static
+    {
+        $this->aggregation = [
+            $type => array_merge(['buckets_path' => $bucketsPath], $options),
+        ];
+
+        return $this;
+    }
+
+    /**
      * Set the aggregation to a raw Elasticsearch aggregation array.
      *
      * Escape hatch for aggregation structures not covered by the builder,

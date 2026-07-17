@@ -148,6 +148,72 @@ The response follows the standard Elasticsearch `_delete_by_query` shape:
 ]
 ```
 
+### Update by Query
+
+Bulk-update documents matching a query via `_update_by_query`. The callback
+builds the query; the optional script applies the change to each match. Extra
+request params (e.g. `conflicts`, `refresh`, `wait_for_completion`) go in the
+last argument. Omit the script to simply reindex matches (e.g. to pick up
+mapping changes).
+
+```php
+Stretch::updateByQuery('posts',
+    fn($q) => $q->term('status', 'draft'),
+    ['source' => "ctx._source.status = 'archived'"],
+    ['conflicts' => 'proceed'],
+);
+```
+
+The response follows the standard `_update_by_query` shape (`updated`, `total`,
+`failures`, ...).
+
+## Point-in-Time
+
+Open and close a point-in-time for consistent deep pagination (see
+[Pagination](pagination.md#point-in-time-pit) for the walk).
+
+```php
+$pit = Stretch::openPointInTime('posts', '1m')['id'];
+// ... walk with ->pointInTime($pit)->searchAfter(...) ...
+Stretch::closePointInTime($pit);
+```
+
+## Debug & Analysis APIs
+
+### Analyze Text
+
+Inspect how an analyzer tokenises input via `_analyze`. Pass an `analyzer` name
+or a `field`, plus the `text`; supply an index to use its analyzers/fields.
+
+```php
+Stretch::analyze(['analyzer' => 'standard', 'text' => 'The Quick Brown Fox']);
+Stretch::analyze(['field' => 'title', 'text' => 'Running quickly'], index: 'posts');
+```
+
+### Explain a Document
+
+Explain why a single document does or does not match a query via `_explain`.
+
+```php
+$result = Stretch::explain('posts', '1', fn($q) => $q->match('title', 'laravel'));
+$matched = $result['matched'];        // bool
+$explanation = $result['explanation']; // score breakdown
+```
+
+For per-hit explanations across a whole search, use
+[`->explain()`](search-tuning.md#explain) on the query builder instead.
+
+### Term Vectors
+
+Retrieve term statistics for a document via `_termvectors`.
+
+```php
+Stretch::termvectors('posts', '1', ['title', 'body'], [
+    'term_statistics' => true,
+    'field_statistics' => true,
+]);
+```
+
 ## Bulk Operations
 
 Execute multiple index, update, or delete operations in a single request:

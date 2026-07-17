@@ -18,6 +18,7 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static QueryBuilderContract query() Create a new query builder instance
  * @method static QueryBuilderContract index(string|array $index) Create a query builder for specific index(es)
  * @method static MultiQueryBuilderContract multi() Create a multi-query builder for batch searches
+ * @method static \JayI\Stretch\Builders\ScrollBuilder scroll(string|array $index, string $keepAlive = '1m') Create a scroll-capable query builder for streaming a full result set
  * @method static \JayI\Stretch\Stretch connection(string $name) Switch to a named connection
  * @method static ClientContract client() Get the underlying Elasticsearch client
  * @method static bool indexExists(string $index) Check if an index exists
@@ -31,6 +32,12 @@ use JayI\Stretch\Contracts\QueryBuilderContract;
  * @method static array updateDocument(string $index, string $id, array $document) Update a document
  * @method static array deleteDocument(string $index, string $id) Delete a document
  * @method static array deleteByQuery(string $index, callable $callback) Delete documents matching a query
+ * @method static array updateByQuery(string $index, callable $callback, ?array $script = null, array $options = []) Update documents matching a query via _update_by_query
+ * @method static array openPointInTime(string $index, string $keepAlive = '1m') Open a point-in-time for consistent deep pagination
+ * @method static array closePointInTime(string $id) Close a previously opened point-in-time
+ * @method static array analyze(array $body, ?string $index = null) Analyze text with an analyzer via _analyze
+ * @method static array explain(string $index, string $id, callable $callback) Explain why a document matches a query via _explain
+ * @method static array termvectors(string $index, string $id, array $fields = [], array $options = []) Retrieve term vectors for a document via _termvectors
  * @method static array getDocument(string $index, string $id) Get a document by ID
  * @method static array putSynonym(string $id, array $synonymsSet, array $options = []) Create or update a synonym set
  * @method static array getSynonym(string $id, array $options = []) Get a synonym set by id

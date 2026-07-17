@@ -107,6 +107,50 @@ $results = Stretch::index('posts')
     ->execute();
 ```
 
+## Prefix, Regexp, Ids & Terms Set
+
+Term-level queries that operate on non-analyzed terms. Use `.keyword` sub-fields for text.
+
+```php
+// Prefix — term begins with the value
+Stretch::index('users')->prefix('user.id', 'ki')->execute();
+Stretch::index('products')->prefix('sku', 'ABC', ['case_insensitive' => true])->execute();
+
+// Regexp — Lucene regular expression
+Stretch::index('users')->regexp('name', 'joh?n(ny)?')->execute();
+Stretch::index('products')->regexp('sku', '[a-z]{3}-[0-9]+', ['flags' => 'ALL'])->execute();
+
+// Ids — fetch specific documents by _id
+Stretch::index('posts')->ids(['1', '4', '100'])->execute();
+
+// Terms Set — match at least N of the given terms
+Stretch::index('records')->termsSet('tags', ['php', 'laravel', 'elasticsearch'], [
+    'minimum_should_match_field' => 'required_matches',
+])->execute();
+
+// ...or derive the minimum from a script
+Stretch::index('records')->termsSet('tags', ['php', 'laravel'], [
+    'minimum_should_match_script' => ['source' => 'Math.min(params.num_terms, 2)'],
+])->execute();
+```
+
+## Search-as-you-type
+
+`matchPhrasePrefix` treats the last term as a prefix while keeping the earlier
+terms as a phrase; `matchBoolPrefix` analyzes terms into a bool query with the
+last term as a prefix (order-independent).
+
+```php
+// Phrase prefix — "quick brown f" matches "quick brown fox"
+Stretch::index('posts')->matchPhrasePrefix('title', 'quick brown f')->execute();
+
+// Bool prefix — terms may appear in any order
+Stretch::index('posts')->matchBoolPrefix('title', 'brown quick f')->execute();
+```
+
+For prefix autocomplete on a dedicated `completion` field, prefer the
+[completion suggester](search-tuning.md#suggesters).
+
 ## Exists Query
 
 Find documents where a field has a non-null value.
@@ -278,6 +322,125 @@ $results = Stretch::index('posts')
 
 The callback receives a fresh `ElasticsearchQueryBuilder` scoped to the nested path. Use the full dotted path for field names inside the callback (e.g., `comments.message`).
 
+## Compound Queries
+
+### dis_max
+
+Run several queries and score each document by its single best-matching clause,
+plus a `tie_breaker` fraction of the rest. The callback receives a fresh query
+builder whose clauses become the `dis_max` operands.
+
+```php
+Stretch::index('posts')
+    ->disMax(function ($q) {
+        $q->match('title', 'quick fox');
+        $q->match('body', 'quick fox');
+    }, tieBreaker: 0.3)
+    ->execute();
+```
+
+### constant_score
+
+Assign every matching document the same score (the boost), ignoring relevance.
+
+```php
+Stretch::index('posts')
+    ->constantScore(fn ($q) => $q->term('status', 'published'), boost: 1.2)
+    ->execute();
+```
+
+### boosting
+
+Return documents matching the positive query, but multiply the score of those
+that also match the negative query by `negativeBoost` (demote without excluding).
+
+```php
+Stretch::index('posts')
+    ->boosting(
+        positive: fn ($q) => $q->match('text', 'apple'),
+        negative: fn ($q) => $q->match('text', 'pie tart'),
+        negativeBoost: 0.5,
+    )
+    ->execute();
+```
+
+See [Scoring](scoring.md) for `scriptScore`, `functionScore`, `rankFeature`,
+and `distanceFeature`.
+
+## Geo Queries
+
+Spatial queries over `geo_point` / `geo_shape` fields.
+
+```php
+// Within a radius of a point
+Stretch::index('stores')
+    ->geoDistance('pin.location', [-70, 40], '200km')
+    ->execute();
+
+// Inside a bounding box
+Stretch::index('stores')
+    ->geoBoundingBox('pin.location', [
+        'top_left' => [-74.1, 40.73],
+        'bottom_right' => [-71.12, 40.01],
+    ])
+    ->execute();
+
+// Shape relation (intersects, within, contains, disjoint)
+Stretch::index('regions')
+    ->geoShape('area', [
+        'type' => 'envelope',
+        'coordinates' => [[-74.1, 40.73], [-71.12, 40.01]],
+    ], relation: 'within')
+    ->execute();
+```
+
+## Span Queries
+
+Low-level positional queries that match on term positions. Span clauses compose:
+`spanNear`, `spanOr`, `spanNot`, `spanFirst`, `spanWithin`, and `spanContaining`
+take other span clauses (built with the same builder) as operands. Return the
+terminal clause from the callback, or rely on the last-built clause.
+
+```php
+// "quick" and "fox" within 3 positions, in order
+Stretch::index('posts')
+    ->span(fn ($s) => $s->spanNear([
+        $s->spanTerm('text', 'quick'),
+        $s->spanTerm('text', 'fox'),
+    ], slop: 3, inOrder: true))
+    ->execute();
+
+// "intro" appearing within the first 3 positions
+Stretch::index('posts')
+    ->span(fn ($s) => $s->spanFirst($s->spanTerm('text', 'intro'), end: 3))
+    ->execute();
+
+// "fox" enclosed by a "quick brown" span
+Stretch::index('posts')
+    ->span(fn ($s) => $s->spanWithin(
+        little: $s->spanTerm('text', 'fox'),
+        big: $s->spanNear([
+            $s->spanTerm('text', 'quick'),
+            $s->spanTerm('text', 'brown'),
+        ], slop: 5),
+    ))
+    ->execute();
+```
+
+Span builder methods: `spanTerm`, `spanMulti` (wrap a prefix/wildcard/fuzzy/regexp/range),
+`spanNear`, `spanOr`, `spanNot`, `spanFirst`, `spanWithin`, `spanContaining`.
+
+## Percolate Query
+
+Reverse search — match a document against queries stored in a `percolator`
+field. Powers alerting and saved-search notifications.
+
+```php
+Stretch::index('alerts')
+    ->percolate('query', ['message' => 'A new bonsai tree is for sale'])
+    ->execute();
+```
+
 ## Filter Shortcut
 
 Add filter context clauses without an explicit bool query. Filters do not affect scoring and are cached by Elasticsearch.
@@ -412,6 +575,25 @@ $results = Stretch::index('products')
     ->trackTotalHits(5000)
     ->execute();
 ```
+
+## Counting
+
+Return just the matching document count via the `_count` API — no hits are
+fetched, so it is cheaper than a search when only the total is needed. Search-only
+concerns (size, sort, aggregations) are ignored.
+
+```php
+$count = Stretch::index('posts')
+    ->term('status', 'published')
+    ->count(); // int
+```
+
+## Related
+
+- [Scoring](scoring.md) — script_score, function_score, rank_feature, distance_feature
+- [Search Tuning](search-tuning.md) — min_score, rescore, runtime fields, suggesters, request routing
+- [Pagination](pagination.md) — search_after, point-in-time, and scroll for deep result sets
+- [Aggregations](aggregations.md) — metrics, buckets, and pipeline aggregations
 
 ## Debugging
 

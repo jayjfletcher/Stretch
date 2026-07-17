@@ -7,6 +7,7 @@ namespace JayI\Stretch;
 use JayI\Stretch\Builders\Concerns\SwitchesConnections;
 use JayI\Stretch\Builders\ElasticsearchQueryBuilder;
 use JayI\Stretch\Builders\MultiQueryBuilder;
+use JayI\Stretch\Builders\ScrollBuilder;
 use JayI\Stretch\Contracts\ClientContract;
 use JayI\Stretch\Contracts\MultiQueryBuilderContract;
 use JayI\Stretch\Contracts\QueryBuilderContract;
@@ -89,6 +90,32 @@ class Stretch
     public function multi(): MultiQueryBuilderContract
     {
         return new MultiQueryBuilder($this->client, $this->manager);
+    }
+
+    /**
+     * Create a ScrollBuilder for streaming an entire result set via the Scroll API.
+     *
+     * The returned builder exposes the full query DSL plus `batches()` and
+     * `cursor()` generators. Best suited to exports and bulk reprocessing;
+     * prefer point-in-time + search_after for user-facing deep pagination.
+     *
+     * @param  string|array  $index  The index (or indices) to scroll
+     * @param  string  $keepAlive  How long each scroll batch stays alive (e.g. '1m')
+     * @return ScrollBuilder A scroll-capable query builder
+     *
+     * @example
+     * ```php
+     * foreach (Stretch::scroll('posts')->term('status', 'published')->cursor() as $hit) {
+     *     // process each document
+     * }
+     * ```
+     */
+    public function scroll(string|array $index, string $keepAlive = '1m'): ScrollBuilder
+    {
+        $builder = new ScrollBuilder($this->client, $this->manager);
+        $builder->index($index)->keepAlive($keepAlive);
+
+        return $builder;
     }
 
     /**
@@ -317,6 +344,153 @@ class Stretch
         return $this->client->deleteByQuery([
             'index' => $index,
             'body' => ['query' => $builder->build()['query'] ?? ['match_all' => (object) []]],
+        ]);
+    }
+
+    /**
+     * Update documents matching a query via _update_by_query.
+     *
+     * The callback builds the query; the script (and optional params) apply the
+     * update to each matching document. When no script is given, matching
+     * documents are simply reindexed (useful to pick up mapping changes).
+     *
+     * @param  string  $index  The index to update
+     * @param  callable  $callback  Receives an ElasticsearchQueryBuilder to build the query
+     * @param  array|null  $script  Optional script (e.g. ['source' => "ctx._source.views++"])
+     * @param  array  $options  Extra request params (e.g. conflicts, refresh, wait_for_completion)
+     * @return array The update-by-query response (updated, total, failures, etc.)
+     *
+     * @throws StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::updateByQuery('posts',
+     *     fn ($q) => $q->term('status', 'draft'),
+     *     ['source' => "ctx._source.status = 'archived'"],
+     * );
+     * ```
+     */
+    public function updateByQuery(string $index, callable $callback, ?array $script = null, array $options = []): array
+    {
+        $builder = new ElasticsearchQueryBuilder;
+        $callback($builder);
+
+        $body = ['query' => $builder->build()['query'] ?? ['match_all' => (object) []]];
+
+        if ($script !== null) {
+            $body['script'] = $script;
+        }
+
+        return $this->client->updateByQuery(array_merge($options, [
+            'index' => $index,
+            'body' => $body,
+        ]));
+    }
+
+    /**
+     * Open a point-in-time (PIT) for consistent deep pagination.
+     *
+     * Pass the returned `id` to `$queryBuilder->pointInTime($id)` and close it
+     * with `closePointInTime()` when the walk completes.
+     *
+     * @param  string  $index  The index (or pattern) to freeze
+     * @param  string  $keepAlive  How long to keep the PIT alive (e.g. '1m')
+     * @return array The response containing the PIT 'id'
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function openPointInTime(string $index, string $keepAlive = '1m'): array
+    {
+        return $this->client->openPointInTime($index, $keepAlive);
+    }
+
+    /**
+     * Close a previously opened point-in-time.
+     *
+     * @param  string  $id  The PIT id to close
+     * @return array The response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function closePointInTime(string $id): array
+    {
+        return $this->client->closePointInTime($id);
+    }
+
+    /**
+     * Analyze text with an analyzer via the _analyze API.
+     *
+     * Useful for debugging how a field's analyzer tokenises input. Pass either
+     * an `analyzer` name or a `field` in $body, along with the `text`.
+     *
+     * @param  array  $body  The analyze body (text, analyzer/field, tokenizer, filters)
+     * @param  string|null  $index  Optional index whose analyzers/fields to use
+     * @return array The analyze response containing tokens
+     *
+     * @throws StretchException If the operation fails
+     *
+     * @example
+     * ```php
+     * Stretch::analyze(['analyzer' => 'standard', 'text' => 'The Quick Brown Fox']);
+     * Stretch::analyze(['field' => 'title', 'text' => 'Running quickly'], index: 'posts');
+     * ```
+     */
+    public function analyze(array $body, ?string $index = null): array
+    {
+        $params = ['body' => $body];
+
+        if ($index !== null) {
+            $params['index'] = $index;
+        }
+
+        return $this->client->analyze($params);
+    }
+
+    /**
+     * Explain why a document matches (or not) a query via the _explain API.
+     *
+     * @param  string  $index  The index containing the document
+     * @param  string  $id  The document id to explain
+     * @param  callable  $callback  Receives an ElasticsearchQueryBuilder to build the query
+     * @return array The explain response (matched flag and score explanation)
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function explain(string $index, string $id, callable $callback): array
+    {
+        $builder = new ElasticsearchQueryBuilder;
+        $callback($builder);
+
+        return $this->client->explain([
+            'index' => $index,
+            'id' => $id,
+            'body' => ['query' => $builder->build()['query'] ?? ['match_all' => (object) []]],
+        ]);
+    }
+
+    /**
+     * Retrieve term vectors for a document via the _termvectors API.
+     *
+     * @param  string  $index  The index containing the document
+     * @param  string  $id  The document id
+     * @param  array  $fields  Fields to return term vectors for
+     * @param  array  $options  Extra body options (term_statistics, field_statistics, offsets, etc.)
+     * @return array The term-vectors response
+     *
+     * @throws StretchException If the operation fails
+     */
+    public function termvectors(string $index, string $id, array $fields = [], array $options = []): array
+    {
+        $body = $options;
+
+        if (! empty($fields)) {
+            $body['fields'] = $fields;
+        }
+
+        return $this->client->termvectors([
+            'index' => $index,
+            'id' => $id,
+            'body' => $body,
         ]);
     }
 

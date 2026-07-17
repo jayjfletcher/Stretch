@@ -165,6 +165,100 @@ Retrieve the top matching documents per bucket:
 
 The `topHits()` method accepts a `size` parameter (default: 100) controlling how many documents to return per bucket.
 
+### Percentiles & Extended Stats
+
+```php
+// Percentiles (custom percents optional)
+->aggregation('load_percentiles', fn($agg) => $agg->percentiles('load_time', [95, 99]))
+
+// Extended stats — adds variance, std deviation and bounds to stats
+->aggregation('grade_stats', fn($agg) => $agg->extendedStats('grade'))
+```
+
+### Geo Metrics
+
+Over `geo_point` fields:
+
+```php
+->aggregation('viewport', fn($agg) => $agg->geoBounds('location'))
+->aggregation('center', fn($agg) => $agg->geoCentroid('location'))
+```
+
+## Bucket Aggregations (Filter & Nested)
+
+### Filter
+
+Run sub-aggregations only over documents matching a filter. The callback builds
+the filter query.
+
+```php
+->aggregation('published_stats', fn($agg) =>
+    $agg->filter(fn($q) => $q->term('status', 'published'))
+        ->subAggregation('avg_price', fn($sub) => $sub->avg('price'))
+)
+```
+
+### Nested
+
+Aggregate within a `nested` field path.
+
+```php
+->aggregation('comment_analytics', fn($agg) =>
+    $agg->nested('comments')
+        ->subAggregation('avg_rating', fn($sub) => $sub->avg('comments.rating'))
+)
+```
+
+## Pipeline Aggregations
+
+Pipeline aggregations consume the output of other aggregations. Parent
+pipelines (`derivative`, `cumulativeSum`, `movingFn`, `bucketScript`,
+`bucketSelector`, `bucketSort`) sit as sub-aggregations of a
+histogram/date_histogram; sibling pipelines (`pipelineBucket`) sit beside the
+referenced multi-bucket aggregation.
+
+```php
+// Monthly sales with a running total and month-over-month change
+->aggregation('sales_per_month', fn($agg) =>
+    $agg->dateHistogram('date', 'month')
+        ->subAggregation('sales', fn($s) => $s->sum('price'))
+        ->subAggregation('cumulative', fn($s) => $s->cumulativeSum('sales'))
+        ->subAggregation('mom_change', fn($s) => $s->derivative('sales'))
+        ->subAggregation('rolling_avg', fn($s) =>
+            $s->movingFn('sales', 'MovingFunctions.unweightedAvg(values)', 3))
+)
+```
+
+`bucketScript` computes a per-bucket metric from siblings; `bucketSelector`
+filters buckets; `bucketSort` orders/paginates them:
+
+```php
+->aggregation('per_category', fn($agg) =>
+    $agg->terms('category.keyword')
+        ->subAggregation('total_sales', fn($s) => $s->sum('price'))
+        ->subAggregation('unit_price', fn($s) =>
+            $s->bucketScript(['sales' => 'total_sales', 'count' => '_count'], 'params.sales / params.count'))
+        ->subAggregation('big_only', fn($s) =>
+            $s->bucketSelector(['t' => 'total_sales'], 'params.t > 1000'))
+        ->subAggregation('top_sellers', fn($s) =>
+            $s->bucketSort([['total_sales' => ['order' => 'desc']]], ['size' => 5]))
+)
+```
+
+Sibling pipelines reference a metric across the buckets of another aggregation
+via `pipelineBucket($type, $path)`, where `$type` is one of `avg_bucket`,
+`sum_bucket`, `min_bucket`, `max_bucket`, or `stats_bucket`:
+
+```php
+->aggregation('sales_per_month', fn($agg) =>
+    $agg->dateHistogram('date', 'month')
+        ->subAggregation('sales', fn($s) => $s->sum('price'))
+)
+->aggregation('avg_monthly_sales', fn($agg) =>
+    $agg->pipelineBucket('avg_bucket', 'sales_per_month>sales')
+)
+```
+
 ## Sub-Aggregations
 
 Nest aggregations inside bucket aggregations for multi-level analytics:

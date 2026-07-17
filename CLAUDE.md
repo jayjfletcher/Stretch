@@ -41,18 +41,41 @@ The query builder uses a builder pattern with internal arrays (`$query`, `$aggre
 
 - `match()` - Full-text search on a single field
 - `matchPhrase()` - Exact phrase matching
+- `matchPhrasePrefix()` / `matchBoolPrefix()` - Search-as-you-type (last term is a prefix)
 - `multiMatch()` - Full-text search across multiple fields with boosts, fuzziness, type options
 - `semantic()` - Semantic/vector search on embedding fields
 - `term()` / `terms()` - Exact value matching
+- `prefix()` / `regexp()` / `ids()` / `termsSet()` - Term-level queries
 - `range()` - Numeric/date range queries (returns chainable RangeQueryBuilder)
 - `bool()` - Composite bool queries with must/should/filter/mustNot/boost
+- `disMax()` / `constantScore()` / `boosting()` - Compound queries
 - `nested()` - Queries on nested object types
 - `wildcard()` / `fuzzy()` / `exists()` - Pattern, approximate, and existence queries
+- `rankFeature()` / `distanceFeature()` - Boost by numeric feature / proximity (recency, geo)
+- `scriptScore()` / `functionScore()` - Custom scoring (script re-score; decay/field_value_factor/random via FunctionScoreBuilder)
+- `geoDistance()` / `geoBoundingBox()` / `geoShape()` - Geo queries
+- `span()` - Positional/proximity queries via SpanQueryBuilder (spanTerm/spanNear/spanOr/spanNot/spanFirst/spanWithin/spanContaining/spanMulti)
+- `percolate()` - Reverse search: match a document against stored queries (alerting)
 - `knn()` - k-nearest-neighbor vector search (supports both literal vectors and `query_vector_builder` for server-side embeddings)
 - `retriever()` - Modern ES 8.14+ retriever API (standard, kNN, RRF)
 - `filter()` - Filter context (no scoring, cached)
 - `postFilter()` - Applied after aggregations; narrows hits without affecting aggregation buckets (faceted search)
 - `delete()` - Executes a `_delete_by_query` using the built query instead of searching; returns ES delete response
+- `count()` - Returns the matching document count via `_count` (no hits fetched)
+
+### Search Body / Request Tuning
+
+Builder methods that shape the request beyond the query clause:
+
+- `searchAfter($sortValues)` + `pointInTime($id, $keepAlive)` - Deep pagination past the 10k `from+size` cap. Open a PIT with `Stretch::openPointInTime()`, walk with a deterministic `sort` + `searchAfter`, close with `Stretch::closePointInTime()`. When a PIT is set no `index` is sent.
+- `minScore()` - Drop hits below a score threshold
+- `explain()` - Per-hit `_explanation` score breakdown
+- `terminateAfter($n)` - Early-terminate after N docs per shard
+- `rescore($callback, $windowSize, $options)` - Two-phase re-scoring of the top window (chainable)
+- `runtimeMappings()` - Query-time computed fields
+- `fields()` / `docvalueFields()` - Retrieve formatted/derived fields independent of `_source`
+- `searchType()` / `preference()` / `routing()` - Shard routing & consistent scoring (sent as request params, not body)
+- `suggest($callback)` - term/phrase/completion suggesters via SuggestBuilder (autocomplete, did-you-mean)
 
 ### kNN with Server-Side Embeddings
 
@@ -71,7 +94,8 @@ Pass `null` for the vector parameter and provide `query_vector_builder` in optio
 
 ### Aggregations
 
-- Builder methods: `terms()`, `dateHistogram()`, `range()`, `histogram()`, `avg()`, `sum()`, `min()`, `max()`, `count()`, `cardinality()`, `topHits()`, `stats()`
+- Bucket/metric methods: `terms()`, `dateHistogram()`, `range()`, `histogram()`, `avg()`, `sum()`, `min()`, `max()`, `count()`, `cardinality()`, `topHits()`, `stats()`, `extendedStats()`, `percentiles()`, `geoBounds()`, `geoCentroid()`, `filter()` (filtered bucket), `nested()`
+- Pipeline aggregations: `derivative()`, `cumulativeSum()`, `movingFn()`, `bucketScript()`, `bucketSelector()`, `bucketSort()`, `pipelineBucket($type, $path)` (avg/sum/min/max/stats_bucket)
 - `raw()` - Escape hatch for any aggregation structure not covered by the builder (filtered aggs, nested aggs, etc.)
 - `rawAggregation()` on the query builder - Adds a raw aggregation directly without going through the AggregationBuilder
 
@@ -127,6 +151,41 @@ Use `trackTotalHits()` to get accurate total hit counts beyond the default 10,00
 ```php
 ->trackTotalHits()      // true for exact count
 ->trackTotalHits(5000)  // integer threshold
+```
+
+### Update By Query / PIT / Debug APIs
+
+```php
+// Bulk update matching docs via script
+Stretch::updateByQuery('posts',
+    fn ($q) => $q->term('status', 'draft'),
+    ['source' => "ctx._source.status = 'archived'"],
+    ['conflicts' => 'proceed'],
+);
+
+// Point-in-time for consistent deep paging
+$pit = Stretch::openPointInTime('posts', '1m')['id'];
+// ... walk with ->pointInTime($pit)->searchAfter(...) ...
+Stretch::closePointInTime($pit);
+
+// Debug tooling
+Stretch::analyze(['analyzer' => 'standard', 'text' => 'Quick Fox'], index: 'posts');
+Stretch::explain('posts', '1', fn ($q) => $q->match('title', 'laravel'));
+Stretch::termvectors('posts', '1', ['title'], ['term_statistics' => true]);
+```
+
+### Scroll API
+
+`Stretch::scroll($index, $keepAlive)` returns a `ScrollBuilder` (extends the query
+builder, full DSL available) for streaming an entire result set. Two generators:
+`cursor()` (one hit at a time) and `batches()` (a page at a time). Opens the scroll
+on first fetch, clears it automatically on completion or abandonment. Prefer PIT +
+`searchAfter` for user-facing deep paging; use scroll for exports/bulk reprocessing.
+
+```php
+foreach (Stretch::scroll('posts')->term('status', 'published')->cursor() as $hit) {
+    // process each document
+}
 ```
 
 ### Ingest Pipelines

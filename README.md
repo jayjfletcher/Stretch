@@ -62,13 +62,15 @@ $results = Stretch::index('orders')
 | Document | Description |
 |----------|-------------|
 | [Configuration](docs/configuration.md) | Connection setup, all config options, env vars, multiple connections |
-| [Queries](docs/queries.md) | All query types: match, multi_match, term, range, bool, nested, wildcard, fuzzy, semantic |
-| [Aggregations](docs/aggregations.md) | Bucket and metric aggregations, stats, raw aggregations, sub-aggregations |
+| [Queries](docs/queries.md) | All query types: match, multi_match, term-level, range, bool, compound, geo, span, percolate, count |
+| [Scoring](docs/scoring.md) | rank_feature, distance_feature, script_score, function_score (decay, field_value_factor, random) |
+| [Search Tuning](docs/search-tuning.md) | min_score, rescore, runtime fields, field selection, suggesters, request routing |
+| [Aggregations](docs/aggregations.md) | Bucket, metric, geo, and pipeline aggregations, sub-aggregations, raw escape hatch |
 | [Hybrid Search](docs/hybrid-search.md) | kNN vector search, server-side embeddings, Retriever API, RRF |
 | [Multi-Search](docs/multi-search.md) | Execute multiple queries in a single request |
 | [Caching](docs/caching.md) | Cache setup, TTL, stale-while-revalidate, cache stores |
-| [Index Management](docs/index-management.md) | Index/document CRUD, bulk API, pipelines, inference, ML models |
-| [Pagination](docs/pagination.md) | ElasticPaginator usage with Laravel's pagination |
+| [Index Management](docs/index-management.md) | Index/document CRUD, update-by-query, PIT, analyze/explain/termvectors, bulk, pipelines, inference, ML |
+| [Pagination](docs/pagination.md) | ElasticPaginator, deep paging with search_after + point-in-time, Scroll API |
 | [Synonyms](docs/synonyms.md) | Manage synonym sets and rules via the Synonyms API |
 
 ## Testing
