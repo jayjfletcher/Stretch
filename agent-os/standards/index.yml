@@ -1,2 +1,44 @@
 # Agent OS Standards Index
 
+backend:
+  callback-sub-builders:
+    description: Composite clauses use a fresh sub-builder; parent extracts build() result.
+  config-safe-defaults:
+    description: Throw on missing/empty connection; SSL verify defaults ON unless opted out.
+  contract-first-di:
+    description: Depend on contracts; native ES client wrapped behind ClientContract.
+  empty-clause-skip:
+    description: Skip attaching callback clauses that add no query, avoiding invalid ES DSL.
+  facade-method-sync:
+    description: Mirror every public Stretch method as an @method static tag on the facade.
+  fluent-builder:
+    description: Chainable static-returning methods; build() assembles, execute() sends; single-clause unwrap.
+  guard-builder-options:
+    description: build() throws LogicException when an option is used on an unsupported type.
+  immutable-connection-switch:
+    description: connection() clones and swaps client instead of mutating in place.
+  lazy-cached-connections:
+    description: Manager lazy-builds/caches clients by name; purge forgets container singletons.
+  named-msearch:
+    description: MultiQueryBuilder sorts keys at build and remap so names pair to positional responses.
+  per-query-config-fallback:
+    description: Nullable settings resolved as per-query value ?? config default, lazily in getters.
+  raw-escape-hatch:
+    description: Typed helpers for common DSL, raw()/rawAggregation() as guaranteed fallback.
+  shared-trait-duck-typing:
+    description: Shared traits detect host shape via method_exists/property_exists, not an interface.
+  structural-cache-keys:
+    description: Cache key from sha1 of sorted build(), scoped by connection and index.
+  tolerate-response-shapes:
+    description: Parse ES responses with data_get defaults; handle both hits.total int and object forms.
+  wrap-client-exceptions:
+    description: Every client call wraps native errors in StretchException; indexExists 404-only false.
+testing:
+  mock-client-contract:
+    description: Mock ClientContract with Mockery; assert payload via m::on or literal ->with.
+  pest-style:
+    description: Pest it() behavior phrases with fluent expect()->and() chains; ->throws for exceptions.
+  test-build-output:
+    description: Query-shape tests use a bare builder and assert build() output, no client.
+  testbench-harness:
+    description: Orchestra Testbench + Workbench; inline config() in beforeEach; array cache store.
