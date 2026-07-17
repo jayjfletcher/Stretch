@@ -80,7 +80,7 @@ jobs:
           git fetch --tags origin || true
           LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
           echo "Previous tag $LATEST_TAG"
-          TAG=$(./scripts/increment_version.sh "$LATEST_TAG" "${{ inputs.type }}")
+          TAG=$(./bin/increment_version.sh "$LATEST_TAG" "${{ inputs.type }}")
           echo "New tag $TAG"
           git tag "$TAG"
           git push origin "$TAG"
