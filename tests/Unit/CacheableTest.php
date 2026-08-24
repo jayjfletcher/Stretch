@@ -153,7 +153,18 @@ it('includes prefix in cache key', function () {
 
     $key = $builder->getCacheKey();
 
-    expect($key)->toStartWith('search:');
+    expect($key)->toStartWith('{search:');
+});
+
+it('wraps the cache key in a redis cluster hash tag', function () {
+    $builder = new ElasticsearchQueryBuilder;
+    $builder->index('products')
+        ->match('name', 'test');
+
+    // flexible() MGETs the key with its illuminate:cache:flexible:created:
+    // twin; the {hash tag} keeps the pair on one cluster slot so clustered
+    // Redis does not reject the cross-slot MGET.
+    expect($builder->getCacheKey())->toMatch('/^\{[^{}]+\}$/');
 });
 
 it('getIndexes returns single index for query builder', function () {

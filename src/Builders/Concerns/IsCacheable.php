@@ -284,6 +284,12 @@ trait IsCacheable
      * different queries — and identical queries executed against different
      * connections — produce different cache keys.
      *
+     * The whole key is wrapped in a Redis cluster hash tag ({...}) so that
+     * flexible() can MGET the key together with its
+     * `illuminate:cache:flexible:created:` twin on a single cluster slot —
+     * without the shared tag the pair hashes to different slots and clustered
+     * Redis rejects the cross-slot MGET (phpredis returns false).
+     *
      * @return string The generated cache key
      */
     public function getCacheKey(): string
@@ -292,7 +298,7 @@ trait IsCacheable
         $hash = sha1(serialize($sorted));
         $indexes = $this->getIndexes()->implode(':');
 
-        return $this->getCachePrefix().$this->getConnectionName().':'.$indexes.$hash;
+        return '{'.$this->getCachePrefix().$this->getConnectionName().':'.$indexes.$hash.'}';
     }
 
     /**
