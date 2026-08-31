@@ -45,7 +45,9 @@ class Stretch
      */
     public function query(): QueryBuilderContract
     {
-        return new ElasticsearchQueryBuilder($this->client, $this->manager);
+        return $this->propagateConnectionTo(
+            new ElasticsearchQueryBuilder($this->client, $this->manager)
+        );
     }
 
     /**
@@ -89,7 +91,9 @@ class Stretch
      */
     public function multi(): MultiQueryBuilderContract
     {
-        return new MultiQueryBuilder($this->client, $this->manager);
+        return $this->propagateConnectionTo(
+            new MultiQueryBuilder($this->client, $this->manager)
+        );
     }
 
     /**
@@ -112,7 +116,9 @@ class Stretch
      */
     public function scroll(string|array $index, string $keepAlive = '1m'): ScrollBuilder
     {
-        $builder = new ScrollBuilder($this->client, $this->manager);
+        $builder = $this->propagateConnectionTo(
+            new ScrollBuilder($this->client, $this->manager)
+        );
         $builder->index($index)->keepAlive($keepAlive);
 
         return $builder;
