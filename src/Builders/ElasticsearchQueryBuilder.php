@@ -464,6 +464,9 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
      *
      * Bool queries combine multiple query clauses. If a callback is provided,
      * the query is built immediately. Otherwise, returns the builder for chaining.
+     * When the callback adds no clauses, the bool clause is skipped entirely:
+     * an empty `bool` serializes to `[]` rather than `{}` and Elasticsearch
+     * rejects it with a parsing_exception.
      *
      * @param  callable|null  $callback  Optional callback receiving the BoolQueryBuilder
      * @return BoolQueryBuilderContract The bool query builder
@@ -483,7 +486,12 @@ class ElasticsearchQueryBuilder implements QueryBuilderContract
 
         if ($callback) {
             $callback($boolBuilder);
-            $this->addQueryProtected($boolBuilder->build());
+
+            $bool = $boolBuilder->build();
+
+            if (! empty($bool['bool'])) {
+                $this->addQueryProtected($bool);
+            }
         }
 
         return $boolBuilder;

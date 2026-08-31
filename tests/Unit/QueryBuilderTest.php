@@ -72,6 +72,32 @@ it('can create a bool query', function () {
     expect($query['query']['bool'])->toHaveKey('filter');
 });
 
+it('skips the bool clause when the callback adds no clauses', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->bool(function ($bool) {
+        // No clauses apply: an empty bool would serialize to `[]` and
+        // Elasticsearch rejects it with a parsing_exception.
+    });
+
+    $query = $builder->build();
+
+    expect($query)->not->toHaveKey('query');
+});
+
+it('keeps the bool clause when only some conditional clauses apply', function () {
+    $builder = new ElasticsearchQueryBuilder;
+
+    $builder->bool(function ($bool) {
+        $bool->filter(fn ($q) => $q->term('status', 'published'));
+    });
+
+    $query = $builder->build();
+
+    expect($query['query']['bool'])->toHaveKey('filter');
+    expect($query['query']['bool'])->not->toHaveKey('must');
+});
+
 it('can set size and from', function () {
     $builder = new ElasticsearchQueryBuilder;
 
