@@ -55,4 +55,44 @@ trait SwitchesConnections
     {
         return $this->connectionName ?? $this->manager?->getDefaultConnection() ?? 'default';
     }
+
+    /**
+     * Bind this instance to a connection name without re-resolving the client.
+     *
+     * Used by a factory to stamp the name onto the instance it just created
+     * from an already-bound one; `connection()` remains the way to *switch* a
+     * connection, which swaps the client too.
+     *
+     * @internal
+     */
+    public function bindConnectionName(?string $name): static
+    {
+        $this->connectionName = $name;
+
+        return $this;
+    }
+
+    /**
+     * Carry this instance's connection binding onto an instance it created.
+     *
+     * A factory (`query()`, `multi()`, `scroll()`) hands the swapped client to
+     * the new instance, so the query already reaches the right cluster — but
+     * without the name the new instance reports the *default* connection.
+     * That name is not cosmetic: it namespaces the response cache key, so two
+     * connections holding an identically named index would otherwise share one
+     * cache entry and serve each other's hits.
+     *
+     * @template TTarget of object
+     *
+     * @param  TTarget  $target  The instance created from this one
+     * @return TTarget The same instance, bound to this connection
+     */
+    protected function propagateConnectionTo(object $target): object
+    {
+        if ($this->connectionName !== null && method_exists($target, 'bindConnectionName')) {
+            $target->bindConnectionName($this->connectionName);
+        }
+
+        return $target;
+    }
 }

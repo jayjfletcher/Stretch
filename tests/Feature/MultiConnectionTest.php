@@ -61,3 +61,39 @@ it('validates connection configuration', function () {
     expect(fn () => $manager->connection('nonexistent'))
         ->toThrow(InvalidArgumentException::class, 'Elasticsearch connection [nonexistent] not configured.');
 });
+
+/**
+ * `connection()` swaps the client on the Stretch instance, but the factories
+ * (`query()`, `index()`, `multi()`, `scroll()`) build a *new* instance and only
+ * used to forward the client — not the connection name. The query still reached
+ * the right cluster, so nothing failed loudly; what broke was everything keyed
+ * on the name. The response cache key is namespaced by it, so two connections
+ * holding an identically named index shared one cache entry and could serve
+ * each other's hits.
+ */
+it('carries the connection name from Stretch onto the builders it creates', function () {
+    $defaultClientContract = Mockery::mock(ClientContract::class);
+    $manager = Mockery::mock(ElasticsearchManager::class);
+    $manager->shouldReceive('connection')->with('alternative')
+        ->andReturn(ClientBuilder::create()->setHosts(['localhost:9200'])->build());
+    $manager->shouldReceive('getDefaultConnection')->andReturn('default');
+
+    $connected = (new Stretch($defaultClientContract, $manager))->connection('alternative');
+
+    expect($connected->getConnectionName())->toBe('alternative')
+        ->and($connected->query()->getConnectionName())->toBe('alternative')
+        ->and($connected->index('posts')->getConnectionName())->toBe('alternative')
+        ->and($connected->multi()->getConnectionName())->toBe('alternative')
+        ->and($connected->scroll('posts')->getConnectionName())->toBe('alternative');
+});
+
+it('leaves builders on the default connection when none was selected', function () {
+    $defaultClientContract = Mockery::mock(ClientContract::class);
+    $manager = Mockery::mock(ElasticsearchManager::class);
+    $manager->shouldReceive('getDefaultConnection')->andReturn('default');
+
+    $stretch = new Stretch($defaultClientContract, $manager);
+
+    expect($stretch->index('posts')->getConnectionName())->toBe('default')
+        ->and($stretch->multi()->getConnectionName())->toBe('default');
+});
